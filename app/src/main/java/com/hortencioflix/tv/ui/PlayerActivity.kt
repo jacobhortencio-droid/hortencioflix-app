@@ -1707,7 +1707,11 @@ class PlayerActivity : BaseActivity() {
         val away = android.os.SystemClock.elapsedRealtime() - bgAt
         bgAt = 0
         val p = player ?: return
-        if (bgWasPlaying && away < 3 * 60_000L) {
+        if (Session.live && bgWasPlaying) {
+            // TV ao vivo: volta ao direto (não ao ponto em que saíste)
+            p.seekToDefaultPosition()
+            p.play()
+        } else if (bgWasPlaying && away < 3 * 60_000L) {
             // saída rápida: continua logo (a lógica da pausa longa reabre a fonte se o link tiver expirado)
             p.play()
         } else {
