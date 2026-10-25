@@ -44,7 +44,7 @@ jobs:
               r=$(curl -s -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
                 https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain -d "{\"subdomain\":\"$n\"}")
               echo "== registar subdomínio $n: $(echo "$r" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('success'),[e.get('message') for e in d.get('errors',[])])")" >> /tmp/diag.txt
-              echo "$r" | grep -q '"success":true' && break
+              echo "$r" | grep -qE '"success": ?true' && break
             done
             sleep 5
           fi
@@ -55,6 +55,14 @@ jobs:
           cat /tmp/deploy.txt
           grep -oE "https://[a-z0-9.-]+\.workers\.dev" /tmp/deploy.txt | head -1 > /tmp/url.txt
           echo "Endereço: $(cat /tmp/url.txt)"
+          # verificação em direto
+          if [ -s /tmp/url.txt ]; then
+            sleep 10
+            u=$(cat /tmp/url.txt)
+            echo "== em direto /health: $(curl -s --max-time 20 $u/health)" >> /tmp/diag.txt
+            c=$(python3 -c "import base64,json;print(base64.urlsafe_b64encode(json.dumps({'a':['https://v3-cinemeta.strem.io']}).encode()).decode().rstrip('='))")
+            echo "== em direto /stream: $(curl -s --max-time 30 $u/$c/stream/movie/tt0111161.json | head -c 300)" >> /tmp/diag.txt
+          fi
           exit $rc
       - name: Guardar o endereço (ramo ci-curador)
         if: always()
