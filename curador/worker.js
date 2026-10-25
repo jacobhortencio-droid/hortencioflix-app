@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 8000;
@@ -72,6 +72,8 @@ export function decodeCfg(raw) {
       let u = x.trim().replace(/\/manifest\.json$/i, "").replace(/\/+$/, "");
       if (u.startsWith("stremio://")) u = "https://" + u.slice(10);
       if (!/^https?:\/\//i.test(u)) continue;
+      // endereços da rede de casa: inalcançáveis daqui (e não devem ser pedidos por um servidor público)
+      if (/^https?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|[^/]*\.local(?:[:/]|$))/i.test(u)) continue;
       if (!addons.includes(u)) addons.push(u);
       if (addons.length >= MAX_ADDONS) break;
     }

@@ -431,8 +431,8 @@ object Addons {
             bases.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }.awaitAll()
         } else {
             val skip = curatorSkip()
-            val viaServer = bases.filter { it !in skip }
-            val early = bases.filter { it in skip }.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }
+            val viaServer = bases.filter { it !in skip && !isLocalAddon(it) }
+            val early = bases.filter { it in skip || isLocalAddon(it) }.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }
             val curated = if (viaServer.isNotEmpty()) async(Dispatchers.IO) { curatedStreams(cur, viaServer, type, id) }.await() else null
             val late = (curated?.second ?: viaServer).map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }
             if (curated != null) rememberSkip(curated.second)
@@ -538,6 +538,13 @@ object Addons {
     }
 
     fun clearCuratorSkip() = Prefs.remove("curSkip")
+
+    /** Add-on neste aparelho ou na rede de casa: o servidor na Internet nunca o alcança. */
+    fun isLocalAddon(b: String): Boolean {
+        val h = try { java.net.URI(b).host?.lowercase() ?: "" } catch (e: Exception) { "" }
+        return h == "localhost" || h.endsWith(".local") || h.startsWith("127.") || h.startsWith("10.") || h.startsWith("192.168.") ||
+            Regex("^172\\.(1[6-9]|2\\d|3[01])\\.").containsMatchIn(h)
+    }
 
     /** Add-ons que dão fontes para este título (para o teste do servidor). */
     suspend fun streamBases(type: String, id: String): List<String> = supporting("stream", type, id)

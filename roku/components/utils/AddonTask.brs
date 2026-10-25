@@ -391,7 +391,7 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
         viaServer = []
         early = []
         for each b in bases
-            if skip.DoesExist(curKey(b)) then early.Push(b) else viaServer.Push(b)
+            if skip.DoesExist(curKey(b)) or isLocalAddon(b) then early.Push(b) else viaServer.Push(b)
         end for
         urls = []
         if viaServer.Count() > 0
@@ -1744,3 +1744,9 @@ sub curSkipAdd(skip as object, failed as object)
     sec.Write("curSkip", FormatJson(skip))
     sec.Flush()
 end sub
+
+' Add-on na rede de casa (ou na própria TV): o servidor na Internet nunca o alcança
+function isLocalAddon(b as string) as boolean
+    rx = CreateObject("roRegex", "^https?://(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|[^/]*\.local[:/])", "i")
+    return rx.IsMatch(b)
+end function

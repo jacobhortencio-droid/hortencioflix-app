@@ -113,7 +113,7 @@ class SettingsActivity : BaseActivity() {
                 com.hortencioflix.tv.data.Addons.clearCuratorSkip()
                 // um filme conhecido, para ver as fontes a chegar
                 val t0 = android.os.SystemClock.elapsedRealtime()
-                val bases = com.hortencioflix.tv.data.Addons.streamBases("movie", "tt0111161")
+                val bases = com.hortencioflix.tv.data.Addons.streamBases("movie", "tt0111161").filter { !com.hortencioflix.tv.data.Addons.isLocalAddon(it) }
                 val d = com.hortencioflix.tv.data.Http.getJson("$u/${com.hortencioflix.tv.data.Addons.curatorConfig(bases)}/stream/movie/tt0111161.json")
                 val ms = android.os.SystemClock.elapsedRealtime() - t0
                 val n = d?.optJSONArray("streams")?.length() ?: 0
