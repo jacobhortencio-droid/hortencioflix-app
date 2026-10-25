@@ -54,6 +54,16 @@ jobs:
             /tmp/gradle-8.7/bin/gradle testReleaseUnitTest assembleRelease --no-daemon --stacktrace
           } 2>&1 | tee build-log.txt
 
+      - name: Verificar app Roku (compilador BrighterScript)
+        id: roku
+        if: always()
+        shell: bash
+        run: |
+          cd roku
+          echo '{"rootDir":".","files":["manifest","source/**/*","components/**/*"],"createPackage":false}' > bsconfig.json
+          npx -y brighterscript@0 --project bsconfig.json 2>&1 | tee /tmp/roku-check.txt || true
+          grep -qiE "error" /tmp/roku-check.txt && echo "::warning::Erros na app Roku" || true
+
       - name: Empacotar app Roku
         if: steps.build.outcome == 'success'
         shell: bash
@@ -77,7 +87,8 @@ jobs:
           git checkout --orphan ci-status-tmp
           git rm -rf . -q || true
           cp /tmp/ci/* .
-          git add build-log.txt errors.txt status.txt
+          cp /tmp/roku-check.txt . 2>/dev/null || echo "sem verificação" > roku-check.txt
+          git add build-log.txt errors.txt status.txt roku-check.txt
           git commit -q -m "CI ${{ github.run_number }}: ${{ steps.build.outcome }}"
           git push -f origin HEAD:ci-status
 
