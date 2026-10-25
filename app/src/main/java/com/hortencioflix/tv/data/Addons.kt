@@ -421,7 +421,10 @@ object Addons {
 
     private suspend fun fetchStreams(type: String, id: String, ignoreMax: Boolean): List<StreamItem> = coroutineScope {
         val bases = supporting("stream", type, id)
-        val results = bases.map { b ->
+        // Fontes curadas: um só pedido ao teu servidor (junta, tira repetidos, confirma no TorBox).
+        // Se falhar ou vier vazio, pede diretamente a cada add-on como antes.
+        val curated = curatorUrl()?.let { cur -> if (bases.isNotEmpty()) curatedStreams(cur, bases, type, id) else null }
+        val results = if (curated != null) listOf(CURATOR to curated) else bases.map { b ->
             async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") }
         }.awaitAll()
         val good = ArrayList<StreamItem>()
@@ -432,9 +435,10 @@ object Addons {
         if (ignoreMax) maxQ = 0
         for ((b, d) in results) {
             val arr = d?.optJSONArray("streams") ?: continue
-            val addonName = manifests[b]?.optString("name")?.ifEmpty { b } ?: b
+            val baseName = manifests[b]?.optString("name")?.ifEmpty { b } ?: b
             for (i in 0 until arr.length()) {
                 val s = arr.optJSONObject(i) ?: continue
+                val addonName = s.optString("addon").ifEmpty { baseName }
                 val url = s.optString("url")
                 if (!url.startsWith("http", true)) continue
                 val bh = s.optJSONObject("behaviorHints")
@@ -486,6 +490,32 @@ object Addons {
             val (a, b) = ready.partition { sourceSignature(it) == pref && (pin.isEmpty() || SourceFilters.passes(it, pin)) }
             a + b + notReady
         }
+    }
+
+    // ---------- Fontes curadas (servidor próprio, ver pasta curador/) ----------
+
+    private const val CURATOR = "curador"
+
+    /** Endereço do servidor de fontes curadas, se estiver ligado. */
+    fun curatorUrl(): String? {
+        val u = Prefs.str("curatorUrl").trim().trimEnd('/')
+        return if (u.startsWith("http", true) && Prefs.str("curatorOn", "1") == "1") u else null
+    }
+
+    /** Configuração no endereço: add-ons de fontes e (se o debrid for o TorBox) a chave. */
+    fun curatorConfig(bases: List<String>): String {
+        val o = JSONObject().put("a", JSONArray(bases))
+        if (Prefs.debridService == "torbox" && Prefs.torboxKey.isNotEmpty()) o.put("k", Prefs.torboxKey)
+        return android.util.Base64.encodeToString(o.toString().toByteArray(Charsets.UTF_8),
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+    }
+
+    private fun curatedStreams(cur: String, bases: List<String>, type: String, id: String): JSONObject? {
+        val t0 = SystemClock.elapsedRealtime()
+        val d = Http.getJson("$cur/${curatorConfig(bases)}/stream/$type/${pathId(id)}.json")
+        val n = d?.optJSONArray("streams")?.length() ?: 0
+        PlayLog.add(if (n > 0) "Fontes curadas: $n em ${SystemClock.elapsedRealtime() - t0} ms" else "Fontes curadas sem resposta — a pedir a cada add-on")
+        return if (n > 0) d else null
     }
 
     /** Assinatura de uma fonte (add-on + qualidade + grupo de lançamento) para a lembrar. */

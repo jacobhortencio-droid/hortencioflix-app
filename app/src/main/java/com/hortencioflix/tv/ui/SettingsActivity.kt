@@ -84,6 +84,46 @@ class SettingsActivity : BaseActivity() {
         list.post { list.getChildAt(0)?.requestFocus() }
     }
 
+    private fun curatorMenu() {
+        val url = Prefs.str("curatorUrl")
+        val on = Prefs.str("curatorOn", "1") == "1"
+        val items = arrayListOf(if (url.isEmpty()) "Colar o endereço do servidor…" else "Mudar o endereço ($url)")
+        if (url.isNotEmpty()) { items.add("Testar agora"); items.add(if (on) "Pausar (pedir a cada add-on)" else "Voltar a ligar"); items.add("Remover") }
+        choiceDialog("Fontes curadas", items) { w ->
+            when (w) {
+                0 -> inputDialog("Endereço do servidor", "https://hortencio-fontes….workers.dev", url) { t ->
+                    val u = t.trim().trimEnd('/').removeSuffix("/manifest.json")
+                    if (!u.startsWith("https://")) { toast("O endereço tem de começar por https://"); return@inputDialog }
+                    Prefs.put("curatorUrl", u); Prefs.put("curatorOn", "1"); refresh(); testCurator(u)
+                    com.hortencioflix.tv.data.RokuSync.syncQuietly()
+                }
+                1 -> testCurator(url)
+                2 -> { Prefs.put("curatorOn", if (on) "0" else "1"); refresh(); com.hortencioflix.tv.data.RokuSync.syncQuietly() }
+                3 -> { Prefs.remove("curatorUrl"); refresh(); com.hortencioflix.tv.data.RokuSync.syncQuietly() }
+            }
+        }
+    }
+
+    private fun testCurator(u: String) {
+        toast("A testar o servidor…")
+        lifecycleScope.launch {
+            val r = withContext(Dispatchers.IO) {
+                val h = com.hortencioflix.tv.data.Http.getJson("$u/health")
+                if (h?.optBoolean("ok") != true) return@withContext "O servidor não respondeu. Confirma o endereço."
+                // um filme conhecido, para ver as fontes a chegar
+                val t0 = android.os.SystemClock.elapsedRealtime()
+                val bases = com.hortencioflix.tv.data.Addons.list()
+                val d = com.hortencioflix.tv.data.Http.getJson("$u/${com.hortencioflix.tv.data.Addons.curatorConfig(bases)}/stream/movie/tt0111161.json")
+                val ms = android.os.SystemClock.elapsedRealtime() - t0
+                val n = d?.optJSONArray("streams")?.length() ?: 0
+                val hf = d?.optJSONObject("hf")
+                val ok = hf?.optJSONArray("addons")?.let { a -> (0 until a.length()).count { a.optJSONObject(it)?.optBoolean("ok") == true } } ?: 0
+                "Servidor a funcionar (versão ${h.optString("version")}).\n\nTeste: $n fontes em $ms ms, de $ok add-on(s); ${hf?.optInt("ready") ?: 0} prontas no TorBox."
+            }
+            if (!isFinishing) dialog().setTitle("Fontes curadas").setMessage(r).setPositiveButton("OK", null).show()
+        }
+    }
+
     private fun askPin() {
         val et = android.widget.EditText(this)
         et.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
@@ -282,6 +322,7 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Rede lenta: baixar a qualidade", when (Prefs.str("qualAuto", "ask")) { "auto" -> "Mudar sozinha"; "off" -> "Nunca"; else -> "Perguntar (padrão)" } + " — depois de 3 pausas para carregar em 3 minutos", tag = "qualAuto"))
         rows.add(Row("Trailer no fundo da página do título", onOff(Prefs.str("trailerAuto", "1") == "1") + " — começa sem som ao fim de 2,5 s (não toca com poupança de dados)", tag = "trailerAuto"))
         rows.add(Row("«A seguir» no fim do filme", onOff(Prefs.str("postPlay", "1") == "1") + " — nos créditos, o vídeo encolhe e aparecem filmes para ver a seguir", tag = "postPlay"))
+        rows.add(Row("Fontes curadas (servidor próprio)", (if (Prefs.str("curatorUrl").isEmpty()) "Desligado" else if (Prefs.str("curatorOn", "1") == "1") "Ligado" else "Pausado") + " — um só pedido junta as fontes de todos os add-ons, sem repetidos, e confirma no TorBox o que está pronto", tag = "curator"))
         rows.add(Row("Mini-leitor automático", onOff(Prefs.str("pipAuto", "1") == "1") + " — ao sair da app com um vídeo a tocar, continua numa janela pequena", tag = "pipAuto"))
         rows.add(Row("Voltar onde estavas", onOff(Prefs.str("restoreSession", "1") == "1") + " — se o Android fechar a app a meio de um vídeo, ao abrir volta ao mesmo ponto", tag = "restoreSession"))
         rows.add(Row("Perguntar ao retomar", onOff(Prefs.askResume) + " — «Continuar de 23:10 / Começar do início»", tag = "askResume"))
@@ -392,6 +433,7 @@ class SettingsActivity : BaseActivity() {
             }
             "trailerAuto" -> { Prefs.put("trailerAuto", if (Prefs.str("trailerAuto", "1") == "1") "0" else "1"); refresh() }
             "postPlay" -> { Prefs.put("postPlay", if (Prefs.str("postPlay", "1") == "1") "0" else "1"); refresh() }
+            "curator" -> curatorMenu()
             "pipAuto" -> { Prefs.put("pipAuto", if (Prefs.str("pipAuto", "1") == "1") "0" else "1"); refresh() }
             "restoreSession" -> { Prefs.put("restoreSession", if (Prefs.str("restoreSession", "1") == "1") "0" else "1"); refresh() }
             "rokuType" -> inputDialog("Escrever na TV", "Nome do filme…", "") { txt ->

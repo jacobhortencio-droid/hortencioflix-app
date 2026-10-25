@@ -85,7 +85,10 @@ object RokuSync {
                 .put("prefs", JSONObject()
                     .put("subLang", Prefs.subLang)
                     .put("dubPref", Prefs.str("dubPref"))
-                    .put("rangePref", Prefs.str("rangePref", "auto")))
+                    .put("rangePref", Prefs.str("rangePref", "auto"))
+                    // servidor de fontes curadas (vazio = desligado na Roku também)
+                    .put("curatorUrl", Prefs.str("curatorUrl"))
+                    .put("curatorOn", Prefs.str("curatorOn", "1")))
             val ok = try {
                 lan.newCall(Request.Builder().url("$base/sync?k=$k")
                     .post(SyncMerge.asciiJson(body).toRequestBody("application/json".toMediaType())).build())

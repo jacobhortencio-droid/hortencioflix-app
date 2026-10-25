@@ -7,6 +7,7 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "⚡ Fontes curadas (opcional): com o teu servidor gratuito, um só pedido junta as fontes de todos os add-ons, sem repetidos, e confirma no TorBox o que está pronto — Definições › Fontes curadas",
         "🖼 Mini-leitor: ao ir para o ecrã inicial com um vídeo a tocar, ele continua numa janela pequena, com botões para pausar, recuar 10 s e avançar 30 s (canal seguinte na TV ao vivo)",
         "Sair e voltar já não recomeça: se saíres da app a meio de um vídeo, ao voltar estás no mesmo ponto (em pausa se estiveste fora mais de 3 min)",
         "Se o Android fechar a app em segundo plano, ao abrir de novo volta ao título que estavas a ver",

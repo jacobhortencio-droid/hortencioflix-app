@@ -332,6 +332,11 @@ function startAddonTask(req as object, callback as string) as object
     req.rangePref = cfgRead("rangePref", "auto")
     req.pinFilters = pinnedFilters()
     req.srcStats = cfgRead("srcStats", "{}")
+    ' fontes curadas (servidor próprio): só para pedidos de fontes
+    if req.kind = "streams" and cfgRead("curatorOn", "1") = "1"
+        req.curator = cfgRead("curatorUrl", "")
+        req.tbKey = cfgRead("torboxKey", "")
+    end if
     if m.devCaps = invalid then m.devCaps = deviceCaps()
     req.caps = m.devCaps
     t = CreateObject("roSGNode", "AddonTask")

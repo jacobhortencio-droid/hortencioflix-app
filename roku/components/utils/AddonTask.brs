@@ -381,11 +381,32 @@ end function
 
 function loadStreams(addons as object, mtype as string, id as string, prefs as object) as object
     bases = supportingAddons(addons, "stream", mtype, id)
-    urls = []
-    for each b in bases
-        urls.Push(b + "/stream/" + mtype + "/" + pathId(id) + ".json")
-    end for
-    data = httpJsonMany(urls, 30000, 8)
+    data = invalid
+    ' Fontes curadas: um só pedido ao teu servidor junta tudo (e confirma no TorBox o que está pronto);
+    ' se falhar ou vier vazio, pede a cada add-on como antes
+    cur = sOr(prefs.curator)
+    if Left(LCase(cur), 8) = "https://" and bases.Count() > 0
+        cfg = { a: bases }
+        if sOr(prefs.tbKey) <> "" then cfg.k = prefs.tbKey
+        ba = CreateObject("roByteArray")
+        ba.FromAsciiString(FormatJson(cfg))
+        enc = ba.ToBase64String().Replace("+", "-").Replace("/", "_").Replace("=", "")
+        if Right(cur, 1) = "/" then cur = Left(cur, Len(cur) - 1)
+        one = httpJsonMany([cur + "/" + enc + "/stream/" + mtype + "/" + pathId(id) + ".json"], 25000, 1)
+        d0 = invalid
+        if one.Count() > 0 then d0 = one[0]
+        if d0 <> invalid and type(d0) = "roAssociativeArray" and d0.streams <> invalid and type(d0.streams) = "roArray" and d0.streams.Count() > 0
+            bases = ["curador"]
+            data = [d0]
+        end if
+    end if
+    if data = invalid
+        urls = []
+        for each b in bases
+            urls.Push(b + "/stream/" + mtype + "/" + pathId(id) + ".json")
+        end for
+        data = httpJsonMany(urls, 30000, 8)
+    end if
     maxQ = 0
     if prefs.maxQ <> invalid then maxQ = prefs.maxQ
     cachedOnly = (prefs.cachedOnly = true)
@@ -433,6 +454,7 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
         if d <> invalid and d.streams <> invalid and type(d.streams) = "roArray"
             for each s in d.streams
                 total = total + 1
+                if isStr(s.addon) and s.addon <> "" then addonName = s.addon
                 if isStr(s.url) and LCase(Left(s.url, 4)) = "http"
                     filename = ""
                     headers = []

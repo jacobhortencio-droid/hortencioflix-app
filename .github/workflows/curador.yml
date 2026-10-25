@@ -1,0 +1,44 @@
+name: Curador de fontes
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ "curador/**", ".github/workflows/curador.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Testes
+        run: node curador/test.mjs
+      # Publica no Cloudflare Workers (gratuito) se os segredos existirem:
+      # CLOUDFLARE_API_TOKEN (modelo «Edit Cloudflare Workers») e CLOUDFLARE_ACCOUNT_ID
+      - name: Publicar no Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Faltam os segredos CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID — testes feitos, nada publicado."
+            exit 0
+          fi
+          cd curador
+          npx -y wrangler@3 deploy 2>&1 | tee /tmp/deploy.txt
+          grep -oE "https://[a-z0-9.-]+\.workers\.dev" /tmp/deploy.txt | head -1 > /tmp/url.txt || true
+          echo "Endereço: $(cat /tmp/url.txt)"
+      - name: Guardar o endereço (ramo ci-curador)
+        if: always()
+        run: |
+          [ -s /tmp/url.txt ] || exit 0
+          git config user.name "ci"; git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan cur-tmp; git rm -rf . -q || true
+          cp /tmp/url.txt curador-url.txt; git add curador-url.txt
+          git commit -qm "Curador publicado"; git push -f origin HEAD:ci-curador

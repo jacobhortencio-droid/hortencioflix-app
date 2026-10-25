@@ -294,6 +294,16 @@ function handleSync(method as string, path as string, query as string, buf as st
             v = d.prefs[k]
             if v <> invalid and (type(v) = "roString" or type(v) = "String") and Len(v) <= 12 then cfgWrite(k, v)
         end for
+        cu = d.prefs.curatorUrl
+        if cu <> invalid and (type(cu) = "roString" or type(cu) = "String")
+            if cu = ""
+                cfgDelete("curatorUrl")
+            else if Left(LCase(cu), 8) = "https://" and Len(cu) <= 150
+                cfgWrite("curatorUrl", cu)
+            end if
+        end if
+        co = d.prefs.curatorOn
+        if co <> invalid and (co = "0" or co = "1") then cfgWrite("curatorOn", co)
     end if
     if d.addons <> invalid and type(d.addons) = "roArray"
         ' a Roku só tem ~16 KB de registo: links de add-on muito compridos ficam de fora

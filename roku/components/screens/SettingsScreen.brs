@@ -156,6 +156,10 @@ sub render_x()
         m.actions.Push("introAnim")
         items.Push("Voltar onde estavas ao abrir: " + yesNo(cfgRead("restoreState", "1")))
         m.actions.Push("restoreState")
+        if cfgRead("curatorUrl", "") <> ""
+            items.Push("Fontes curadas (servidor): " + yesNo(cfgRead("curatorOn", "1")))
+            m.actions.Push("curatorOn")
+        end if
         items.Push("Adicionar add-on (URL)")
         m.actions.Push("addAddon")
         items.Push("Gerir add-ons locais (" + getUserAddons().Count().ToStr() + ")")
@@ -288,6 +292,8 @@ sub onSelected_x()
         cycle("introAnim", ["1", "0"], "1")
     else if action = "restoreState"
         cycle("restoreState", ["1", "0"], "1")
+    else if action = "curatorOn"
+        cycle("curatorOn", ["1", "0"], "1")
         render()
     else if action = "rangePref"
         cycle("rangePref", ["auto", "dv", "hdr", "sdr", "off"], "auto")
