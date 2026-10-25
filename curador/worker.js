@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 9000;
@@ -174,7 +174,9 @@ async function fetchAddon(base, type, id) {
         const r = await fetch(path, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(ADDON_TIMEOUT_MS) });
         const txt = await r.text();
         const ms = Date.now() - t0;
-        if (!r.ok) return { ok: false, streams: [], status: r.status, ms, err: /<html|<!doctype/i.test(txt) ? "bloqueado (página HTML)" : "HTTP " + r.status };
+        // 404 = este add-on não tem nada para este título (não é falha)
+        if (r.status === 404) return { ok: true, streams: [], status: 404, ms };
+        if (!r.ok) return { ok: false, streams: [], status: r.status, ms, err: (r.status === 403 || r.status === 429 || r.status === 503) && /<html|<!doctype/i.test(txt) ? "bloqueia servidores (HTTP " + r.status + ")" : "HTTP " + r.status };
         let d = null;
         try { d = JSON.parse(txt); } catch (e) {
           return { ok: false, streams: [], status: r.status, ms, err: /<html|<!doctype/i.test(txt) ? "bloqueado (página HTML)" : "resposta inválida" };
