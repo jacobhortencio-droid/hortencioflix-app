@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 9000;
@@ -170,12 +170,19 @@ async function fetchAddon(base, type, id) {
     addonName(base),
     (async () => {
       try {
+        const t0 = Date.now();
         const r = await fetch(path, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(ADDON_TIMEOUT_MS) });
-        if (!r.ok) return { ok: false, streams: [], status: r.status };
-        const d = await r.json();
-        return { ok: true, streams: Array.isArray(d && d.streams) ? d.streams : [] };
+        const txt = await r.text();
+        const ms = Date.now() - t0;
+        if (!r.ok) return { ok: false, streams: [], status: r.status, ms, err: /<html|<!doctype/i.test(txt) ? "bloqueado (página HTML)" : "HTTP " + r.status };
+        let d = null;
+        try { d = JSON.parse(txt); } catch (e) {
+          return { ok: false, streams: [], status: r.status, ms, err: /<html|<!doctype/i.test(txt) ? "bloqueado (página HTML)" : "resposta inválida" };
+        }
+        return { ok: true, streams: Array.isArray(d && d.streams) ? d.streams : [], status: r.status, ms };
       } catch (e) {
-        return { ok: false, streams: [], status: 0 };
+        const n = (e && e.name) || "";
+        return { ok: false, streams: [], status: 0, err: n === "TimeoutError" || n === "AbortError" ? "sem resposta em 9 s" : "erro de rede" };
       }
     })(),
   ]);
@@ -230,7 +237,7 @@ async function streams(cfg, cfgRaw, type, id, origin, ctx) {
     hf: {
       version: VERSION,
       ms: Date.now() - t0,
-      addons: results.map((r) => ({ name: r.name, ok: r.ok, n: r.streams.length, status: r.status || 200 })),
+      addons: results.map((r) => ({ name: r.name, ok: r.ok, n: r.streams.length, status: r.status || 0, ms: r.ms || 0, err: r.err || "" })),
       checked: hashes.length,
       ready: ready.size,
     },

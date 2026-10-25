@@ -395,9 +395,33 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
         one = httpJsonMany([cur + "/" + enc + "/stream/" + mtype + "/" + pathId(id) + ".json"], 25000, 1)
         d0 = invalid
         if one.Count() > 0 then d0 = one[0]
-        if d0 <> invalid and type(d0) = "roAssociativeArray" and d0.streams <> invalid and type(d0.streams) = "roArray" and d0.streams.Count() > 0
-            bases = ["curador"]
-            data = [d0]
+        if d0 <> invalid and type(d0) = "roAssociativeArray" and d0.streams <> invalid and type(d0.streams) = "roArray"
+            ' os add-ons que o servidor não conseguiu contactar são pedidos diretamente pela Roku
+            failed = []
+            st = invalid
+            if d0.hf <> invalid and type(d0.hf) = "roAssociativeArray" then st = d0.hf.addons
+            if st <> invalid and type(st) = "roArray" and st.Count() = bases.Count()
+                for fi = 0 to st.Count() - 1
+                    if st[fi] = invalid or st[fi].ok <> true then failed.Push(bases[fi])
+                end for
+            else if d0.streams.Count() = 0
+                failed = bases
+            end if
+            nb = []
+            data = []
+            if d0.streams.Count() > 0
+                nb.Push("curador")
+                data.Push(d0)
+            end if
+            if failed.Count() > 0
+                furls = []
+                for each b in failed
+                    furls.Push(b + "/stream/" + mtype + "/" + pathId(id) + ".json")
+                    nb.Push(b)
+                end for
+                data.Append(httpJsonMany(furls, 30000, 8))
+            end if
+            bases = nb
         end if
     end if
     if data = invalid

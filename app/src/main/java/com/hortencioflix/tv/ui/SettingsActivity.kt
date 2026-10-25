@@ -112,13 +112,22 @@ class SettingsActivity : BaseActivity() {
                 if (h?.optBoolean("ok") != true) return@withContext "O servidor não respondeu. Confirma o endereço."
                 // um filme conhecido, para ver as fontes a chegar
                 val t0 = android.os.SystemClock.elapsedRealtime()
-                val bases = com.hortencioflix.tv.data.Addons.list()
+                val bases = com.hortencioflix.tv.data.Addons.streamBases("movie", "tt0111161")
                 val d = com.hortencioflix.tv.data.Http.getJson("$u/${com.hortencioflix.tv.data.Addons.curatorConfig(bases)}/stream/movie/tt0111161.json")
                 val ms = android.os.SystemClock.elapsedRealtime() - t0
                 val n = d?.optJSONArray("streams")?.length() ?: 0
                 val hf = d?.optJSONObject("hf")
-                val ok = hf?.optJSONArray("addons")?.let { a -> (0 until a.length()).count { a.optJSONObject(it)?.optBoolean("ok") == true } } ?: 0
-                "Servidor a funcionar (versão ${h.optString("version")}).\n\nTeste: $n fontes em $ms ms, de $ok add-on(s); ${hf?.optInt("ready") ?: 0} prontas no TorBox."
+                val arr = hf?.optJSONArray("addons")
+                val ok = arr?.let { a -> (0 until a.length()).count { a.optJSONObject(it)?.optBoolean("ok") == true } } ?: 0
+                val lines = StringBuilder()
+                if (arr != null) for (i in 0 until arr.length()) {
+                    val a = arr.optJSONObject(i) ?: continue
+                    lines.append("\n• ").append(a.optString("name")).append(": ")
+                    if (a.optBoolean("ok")) lines.append(a.optInt("n")).append(" fontes (").append(a.optInt("ms")).append(" ms)")
+                    else lines.append("✗ ").append(a.optString("err").ifEmpty { "HTTP " + a.optInt("status") })
+                }
+                val note = if (ok < (arr?.length() ?: 0)) "\n\nOs add-ons com ✗ não aceitam o servidor: a app pede-os diretamente, como antes." else ""
+                "Servidor a funcionar (versão ${h.optString("version")}).\n\nTeste (Os Condenados de Shawshank): $n fontes em $ms ms, $ok de ${arr?.length() ?: 0} add-on(s); ${hf?.optInt("ready") ?: 0} prontas no TorBox.$lines$note"
             }
             if (!isFinishing) dialog().setTitle("Fontes curadas").setMessage(r).setPositiveButton("OK", null).show()
         }

@@ -423,10 +423,12 @@ object Addons {
         val bases = supporting("stream", type, id)
         // Fontes curadas: um só pedido ao teu servidor (junta, tira repetidos, confirma no TorBox).
         // Se falhar ou vier vazio, pede diretamente a cada add-on como antes.
+        // Os add-ons que o servidor não conseguiu contactar (alguns bloqueiam servidores na nuvem) são pedidos
+        // diretamente por este aparelho e juntam-se ao resultado.
         val curated = curatorUrl()?.let { cur -> if (bases.isNotEmpty()) curatedStreams(cur, bases, type, id) else null }
-        val results = if (curated != null) listOf(CURATOR to curated) else bases.map { b ->
-            async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") }
-        }.awaitAll()
+        val direct = curated?.second ?: bases
+        val results = (if (curated != null && (curated.first.optJSONArray("streams")?.length() ?: 0) > 0) listOf(CURATOR to curated.first) else emptyList()) +
+            direct.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }.awaitAll()
         val good = ArrayList<StreamItem>()
         val riskyList = ArrayList<StreamItem>()
         val later = ArrayList<StreamItem>()
@@ -510,12 +512,22 @@ object Addons {
             android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
     }
 
-    private fun curatedStreams(cur: String, bases: List<String>, type: String, id: String): JSONObject? {
+    /** Add-ons que dão fontes para este título (para o teste do servidor). */
+    suspend fun streamBases(type: String, id: String): List<String> = supporting("stream", type, id)
+
+    /** Resposta do servidor e os add-ons a pedir diretamente (os que falharam lá); null = pedir todos diretamente. */
+    private fun curatedStreams(cur: String, bases: List<String>, type: String, id: String): Pair<JSONObject, List<String>>? {
         val t0 = SystemClock.elapsedRealtime()
-        val d = Http.getJson("$cur/${curatorConfig(bases)}/stream/$type/${pathId(id)}.json")
-        val n = d?.optJSONArray("streams")?.length() ?: 0
-        PlayLog.add(if (n > 0) "Fontes curadas: $n em ${SystemClock.elapsedRealtime() - t0} ms" else "Fontes curadas sem resposta — a pedir a cada add-on")
-        return if (n > 0) d else null
+        val d = Http.getJson("$cur/${curatorConfig(bases)}/stream/$type/${pathId(id)}.json") ?: run {
+            PlayLog.add("Fontes curadas sem resposta — a pedir a cada add-on")
+            return null
+        }
+        val n = d.optJSONArray("streams")?.length() ?: 0
+        val st = d.optJSONObject("hf")?.optJSONArray("addons")
+        val failed = if (st != null && st.length() == bases.size) bases.filterIndexed { i, _ -> st.optJSONObject(i)?.optBoolean("ok") != true }
+            else if (n == 0) bases else emptyList()
+        PlayLog.add("Fontes curadas: $n em ${SystemClock.elapsedRealtime() - t0} ms" + if (failed.isNotEmpty()) " · ${failed.size} add-on(s) pedidos diretamente" else "")
+        return d to failed
     }
 
     /** Assinatura de uma fonte (add-on + qualidade + grupo de lançamento) para a lembrar. */
