@@ -32,7 +32,7 @@ jobs:
           fi
           cd curador
           set +e
-          npx -y wrangler@3 deploy > /tmp/deploy.txt 2>&1
+          npx -y wrangler@4 deploy > /tmp/deploy.txt 2>&1
           rc=$?
           cat /tmp/deploy.txt
           grep -oE "https://[a-z0-9.-]+\.workers\.dev" /tmp/deploy.txt | head -1 > /tmp/url.txt
