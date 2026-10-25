@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="live" android:enabled="true" android:icon="@drawable/ic_live"
+        android:shortcutShortLabel="@string/sc_live" android:shortcutLongLabel="@string/sc_live_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.hortencioflix.tv" android:targetClass="com.hortencioflix.tv.ui.IptvActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/ic_search"
+        android:shortcutShortLabel="@string/sc_search" android:shortcutLongLabel="@string/sc_search_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.hortencioflix.tv" android:targetClass="com.hortencioflix.tv.ui.SearchActivity" />
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="DetailsScreen" extends="Group">
+    <interface>
+        <field id="item" type="assocarray" onChange="onItem" />
+        <field id="playRequest" type="assocarray" alwaysNotify="true" />
+        <field id="pushJson" type="string" alwaysNotify="true" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="personSelected" type="string" alwaysNotify="true" />
+        <field id="refresh" type="boolean" alwaysNotify="true" onChange="onRefresh" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Filters.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/DetailsScreen.brs" />
+    <children>
+        <Poster id="backdrop" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0" />
+        <Poster uri="pkg:/images/grad_left.png" width="1920" height="1080" />
+        <Poster uri="pkg:/images/grad_bottom.png" width="1920" height="1080" />
+
+        <Poster id="logoImg" translation="[100,90]" width="700" height="190" loadDisplayMode="scaleToFit" visible="false" />
+        <Label id="title" translation="[100,150]" width="1300" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="info" translation="[100,310]" width="1500" font="font:SmallSystemFont" color="0xC8CAD0FF" />
+        <Label id="desc" translation="[100,356]" width="1050" wrap="true" maxLines="4" font="font:SmallSystemFont" color="0xE6E7EAFF" />
+        <Label id="people" translation="[100,520]" width="1300" wrap="true" maxLines="2" font="font:SmallestSystemFont" color="0x9A9DA6FF" />
+
+        <ButtonGroup id="buttons" translation="[100,610]" layoutDirection="horiz" itemSpacings="[12]" minWidth="200" maxWidth="360"
+            iconUri="" focusedIconUri="" textFont="font:SmallSystemFont" focusedTextFont="font:SmallBoldSystemFont" />
+        <RowList id="more" translation="[100,730]" itemComponentName="PosterItem" numRows="1"
+            itemSize="[1720,320]" rowItemSize="[[160,240]]" rowItemSpacing="[[20,0]]" showRowLabel="[true]"
+            rowLabelOffset="[[0,12]]" drawFocusFeedback="false" rowLabelColor="0xE6E7EAFF"
+            rowFocusAnimationStyle="floatingFocus" visible="false" />
+
+        <Label id="section" translation="[100,430]" width="1700" font="font:MediumBoldSystemFont" color="0xE50914FF" visible="false" />
+        <LabelList id="seasons" translation="[100,500]" itemSize="[250,56]" numRows="9" visible="false"
+            vertFocusAnimationStyle="floatingFocus" color="0xC8CAD0FF" focusedColor="0x0F1014FF"
+            font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" />
+        <LabelList id="episodes" translation="[380,500]" itemSize="[1440,56]" numRows="9" visible="false"
+            vertFocusAnimationStyle="floatingFocus" color="0xE6E7EAFF" focusedColor="0x0F1014FF"
+            font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" />
+        <MarkupList id="streams" translation="[100,496]" itemComponentName="StreamItem" itemSize="[1720,96]"
+            itemSpacing="[0,6]" numRows="5" visible="false" vertFocusAnimationStyle="floatingFocus" />
+
+        <HfLoader id="spinner" translation="[100,500]" visible="false" />
+        <Label id="status" translation="[100,520]" width="1700" wrap="true" font="font:MediumSystemFont" color="0xC8CAD0FF" />
+        <Label id="hint" translation="[100,1030]" width="1720" font="font:SmallestSystemFont" color="0x6E717AFF" />
+        <Animation id="bgFade" duration="0.6" easeFunction="outQuad">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="backdrop.opacity" />
+        </Animation>
+        <!-- «Visualização rápida»: a imagem de fundo ganha vida com um movimento lento de câmara (a Roku não toca trailers do YouTube) -->
+        <Animation id="bgDrift" duration="24" repeat="true" easeFunction="inOutQuad">
+            <Vector2DFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[[1.0,1.0],[1.12,1.12],[1.0,1.0]]" fieldToInterp="backdrop.scale" />
+            <Vector2DFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[[0,0],[-60,-24],[0,0]]" fieldToInterp="backdrop.translation" />
+        </Animation>
+        <MenuPanel id="menu" />
+    </children>
+</component>

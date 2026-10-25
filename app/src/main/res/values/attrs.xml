@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="hfBg" format="color" />
+    <attr name="hfPanel" format="color" />
+    <attr name="hfAccent" format="color" />
+    <attr name="hfAccentDark" format="color" />
+    <!-- Cores que mudam com o tema (escuro, AMOLED, claro, vidro) -->
+    <attr name="hfBgSolid" format="color" />
+    <attr name="hfPanel2" format="color" />
+    <attr name="hfText" format="color" />
+    <attr name="hfMuted" format="color" />
+    <attr name="hfStroke" format="color" />
+    <attr name="hfOverlay" format="color" />
+    <attr name="hfFocus" format="color" />
+    <attr name="hfCardStroke" format="color" />
+    <attr name="hfFadeA" format="color" />
+    <attr name="hfFadeB" format="color" />
+    <attr name="hfFadeC" format="color" />
+    <attr name="hfFadeD" format="color" />
+    <attr name="hfFadeE" format="color" />
+    <attr name="hfFadeF" format="color" />
+</resources>

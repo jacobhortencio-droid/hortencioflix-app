@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Ligar a conta Stremio com um código (como na app oficial para TV) -->
+<component name="StremioLinkScreen" extends="Group">
+    <interface>
+        <field id="linked" type="boolean" alwaysNotify="true" />
+        <field id="closing" type="boolean" onChange="onClosing" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/StremioLinkScreen.brs" />
+    <children>
+        <Label id="header" text="Ligar conta Stremio" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label id="steps" translation="[80,170]" width="1000" wrap="true" font="font:MediumSystemFont" color="0xE6E7EAFF" />
+        <Label id="code" translation="[80,560]" width="1000" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="status" translation="[80,700]" width="1000" wrap="true" font="font:SmallSystemFont" color="0x8A8D96FF"
+            text="A criar código…" />
+        <Rectangle translation="[1240,170]" width="560" height="560" color="0xFFFFFFFF" />
+        <Poster id="qr" translation="[1270,200]" width="500" height="500" loadDisplayMode="scaleToFit" />
+        <Label id="qrHint" translation="[1240,750]" width="560" horizAlign="center" font="font:SmallSystemFont" color="0xC8CAD0FF"
+            text="Lê com a câmara do telemóvel" />
+    </children>
+</component>

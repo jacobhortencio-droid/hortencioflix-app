@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Abertura animada: marca nova (H com «play») a crescer, brilho vermelho→laranja, nome a aparecer e som original -->
+<component name="IntroScreen" extends="Group">
+    <interface>
+        <field id="done" type="boolean" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.wordTimer = m.top.findNode("wordTimer")
+        m.endTimer = m.top.findNode("endTimer")
+        m.aOut = m.top.findNode("aOut")
+        m.wordTimer.observeField("fire", "onWord")
+        m.endTimer.observeField("fire", "onEnd")
+        m.aOut.observeField("state", "onOutState")
+        m.top.findNode("logo").scaleRotateCenter = [200, 200]
+        m.top.findNode("glow").scaleRotateCenter = [350, 350]
+        m.top.findNode("aLogo").control = "start"
+        m.top.findNode("aGlow").control = "start"
+        snd = m.top.findNode("snd")
+        snd.control = "play"
+        m.wordTimer.control = "start"
+        m.endTimer.control = "start"
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("IntroScreen.init", e)
+        end try
+    end sub
+
+    sub onWord_x()
+        m.top.findNode("aWord").control = "start"
+    end sub
+    sub onWord()
+        try
+            onWord_x()
+        catch e
+            reportCrash("IntroScreen.onWord", e)
+        end try
+    end sub
+
+    sub onEnd_x()
+        m.aOut.control = "start"
+    end sub
+    sub onEnd()
+        try
+            onEnd_x()
+        catch e
+            reportCrash("IntroScreen.onEnd", e)
+        end try
+    end sub
+
+    sub onOutState_x()
+        if m.aOut.state = "stopped" then m.top.done = true
+    end sub
+    sub onOutState()
+        try
+            onOutState_x()
+        catch e
+            reportCrash("IntroScreen.onOutState", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Group id="root">
+            <Rectangle width="1920" height="1080" color="0x0F1014FF" />
+            <Poster id="glow" uri="pkg:/images/intro_glow.png" translation="[610,70]" width="700" height="700" opacity="0" />
+            <Poster id="logo" uri="pkg:/images/intro_logo.png" translation="[760,220]" width="400" height="400" opacity="0" scale="[0.4,0.4]" />
+            <Poster id="word" uri="pkg:/images/wordmark.png" translation="[516,720]" width="888" height="170" opacity="0" />
+        </Group>
+        <SoundEffect id="snd" uri="pkg:/sounds/intro.wav" />
+        <Animation id="aLogo" duration="0.9" easeFunction="outCubic">
+            <FloatFieldInterpolator key="[0.0, 0.6, 1.0]" keyValue="[0.0, 1.0, 1.0]" fieldToInterp="logo.opacity" />
+            <Vector2DFieldInterpolator key="[0.0, 0.7, 1.0]" keyValue="[[0.4,0.4],[1.08,1.08],[1.0,1.0]]" fieldToInterp="logo.scale" />
+        </Animation>
+        <Animation id="aGlow" duration="1.8" easeFunction="linear">
+            <FloatFieldInterpolator key="[0.0, 0.35, 1.0]" keyValue="[0.0, 0.95, 0.4]" fieldToInterp="glow.opacity" />
+            <Vector2DFieldInterpolator key="[0.0, 0.35, 1.0]" keyValue="[[0.6,0.6],[1.1,1.1],[1.0,1.0]]" fieldToInterp="glow.scale" />
+        </Animation>
+        <Animation id="aWord" duration="0.7" easeFunction="outCubic">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="word.opacity" />
+            <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[516,720],[516,680]]" fieldToInterp="word.translation" />
+        </Animation>
+        <Animation id="aOut" duration="0.45" easeFunction="inCubic">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="root.opacity" />
+        </Animation>
+        <Timer id="wordTimer" duration="0.6" repeat="false" />
+        <Timer id="endTimer" duration="2.4" repeat="false" />
+    </children>
+</component>

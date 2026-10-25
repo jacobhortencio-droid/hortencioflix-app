@@ -1,0 +1,12 @@
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+
+# definições pessoais (chaves) nunca vão para o repositório
+roku/source/seed.json
+
+# chave de assinatura do APK: guardada como segredo do GitHub (KEYSTORE_B64)
+*.jks
+*.keystore

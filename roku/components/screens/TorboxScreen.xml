@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- A minha TorBox: downloads da conta, progresso dos que ainda estão a descarregar e reprodução dos ficheiros -->
+<component name="TorboxScreen" extends="Group">
+    <interface>
+        <field id="start" type="boolean" onChange="load" />
+        <field id="playRequest" type="assocarray" alwaysNotify="true" />
+        <field id="closing" type="boolean" onChange="onClosing" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/TorboxScreen.brs" />
+    <children>
+        <Label id="header" text="A minha TorBox" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label id="summary" translation="[80,112]" width="1760" font="font:SmallSystemFont" color="0x8A8D96FF" />
+        <MarkupList id="list" translation="[80,170]" itemComponentName="StreamItem" itemSize="[1760,96]"
+            itemSpacing="[0,6]" numRows="8" vertFocusAnimationStyle="floatingFocus" />
+        <HfLoader id="spinner" translation="[80,180]" visible="false" />
+        <Label id="status" translation="[180,200]" width="1600" wrap="true" font="font:MediumSystemFont" color="0xC8CAD0FF" />
+        <Label id="hint" translation="[80,1030]" width="1760" font="font:SmallestSystemFont" color="0x6E717AFF"
+            text="OK: ver ficheiros e reproduzir   ·   * atualizar   ·   A lista atualiza sozinha a cada 15 s   ·   Voltar" />
+        <Timer id="refreshTimer" duration="15" repeat="true" />
+        <MenuPanel id="menu" />
+    </children>
+</component>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fundo do tema Vidro: manchas de cor suaves por trás dos painéis translúcidos -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape><gradient android:angle="315" android:startColor="#0B1030" android:centerColor="#120C2A" android:endColor="#06121F" /></shape></item>
+    <item><shape><gradient android:type="radial" android:gradientRadius="70%p" android:centerX="0.12" android:centerY="0.10" android:startColor="#996D28D9" android:endColor="#006D28D9" /></shape></item>
+    <item><shape><gradient android:type="radial" android:gradientRadius="65%p" android:centerX="0.95" android:centerY="0.30" android:startColor="#802563EB" android:endColor="#002563EB" /></shape></item>
+    <item><shape><gradient android:type="radial" android:gradientRadius="60%p" android:centerX="0.55" android:centerY="1.0" android:startColor="#73E3122B" android:endColor="#00E3122B" /></shape></item>
+    <item><shape><gradient android:type="radial" android:gradientRadius="45%p" android:centerX="0.15" android:centerY="0.85" android:startColor="#5914B8A6" android:endColor="#0014B8A6" /></shape></item>
+</layer-list>

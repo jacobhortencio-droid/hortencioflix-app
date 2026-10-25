@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MainScene" extends="Scene">
+    <interface>
+        <field id="exitApp" type="boolean" alwaysNotify="true" />
+        <field id="launchArgs" type="assocarray" alwaysNotify="true" onChange="onLaunchArgs" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+    <children>
+        <Rectangle id="bg" color="0x0F1014FF" width="1920" height="1080" />
+        <Group id="screens" />
+        <!-- leitor persistente (ecrã inteiro ou mini) por cima dos ecrãs -->
+        <Group id="overlay" />
+    </children>
+</component>

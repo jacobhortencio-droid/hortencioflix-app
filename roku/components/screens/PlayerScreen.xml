@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="PlayerScreen" extends="Group">
+    <interface>
+        <field id="media" type="assocarray" onChange="onMedia" />
+        <field id="mode" type="string" value="full" onChange="onMode" />
+        <field id="command" type="string" alwaysNotify="true" onChange="onCommand" />
+        <field id="closing" type="boolean" onChange="onClosing" />
+        <field id="finished" type="boolean" alwaysNotify="true" />
+        <field id="pushJson" type="string" alwaysNotify="true" />
+        <field id="scrobble" type="assocarray" alwaysNotify="true" />
+        <field id="openTitle" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/PlayerScreen.brs" />
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x000000FF" />
+        <!-- moldura do mini-leitor (atrás do vídeo) -->
+        <Group id="miniFrame" visible="false">
+            <Rectangle id="miniBorder" translation="[1370,740]" width="500" height="290" color="0xE50914FF" />
+            <Rectangle translation="[1370,1030]" width="500" height="44" color="0x16181EFF" />
+            <Label id="miniLabel" translation="[1384,1030]" width="472" height="44" vertAlign="center"
+                font="font:SmallestSystemFont" color="0xE6E7EAFF" />
+        </Group>
+        <Video id="video" width="1920" height="1080" enableUI="true" />
+        <Group id="osd" visible="false">
+            <Rectangle width="1920" height="170" color="0x000000B0" />
+            <Label id="osdTitle" translation="[80,40]" width="1760" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+            <Label id="osdHint" translation="[80,100]" width="1760" font="font:SmallestSystemFont" color="0xC8CAD0FF" />
+        </Group>
+        <Label id="status" translation="[0,980]" width="1920" horizAlign="center" font="font:SmallSystemFont"
+            color="0xE6E7EAFF" text="A preparar o vídeo…" />
+
+        <!-- botão "Saltar introdução" -->
+        <Group id="skipGroup" translation="[1420,880]" visible="false">
+            <ButtonGroup id="skipBtn" minWidth="420" iconUri="" focusedIconUri="" />
+        </Group>
+
+        <!-- cartão "Próximo episódio" com contagem -->
+        <Group id="nextCard" translation="[1220,690]" visible="false">
+            <Rectangle width="640" height="280" color="0x16181EF0" />
+            <Rectangle id="nextBar" width="640" height="6" color="0xE50914FF" />
+            <Label text="Próximo episódio" translation="[30,26]" width="580" font="font:SmallSystemFont" color="0x9A9DA6FF" />
+            <Label id="nextLabel" translation="[30,66]" width="580" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+            <Label id="nextCount" translation="[30,114]" width="580" font="font:SmallSystemFont" color="0xE6E7EAFF" />
+            <ButtonGroup id="nextBtns" translation="[30,170]" layoutDirection="horiz" itemSpacings="[16]" minWidth="270" iconUri="" focusedIconUri="" />
+        </Group>
+
+        <!-- «A seguir» no fim do filme: o vídeo (créditos) encolhe à esquerda e as sugestões aparecem à direita -->
+        <Group id="postPlay" visible="false">
+            <Rectangle width="1920" height="1080" color="0x07080CE6" />
+            <Label id="postHead" text="A SEGUIR" translation="[840,96]" font="font:SmallBoldSystemFont" color="0xE50914FF" />
+            <Poster id="postHero" translation="[840,140]" width="960" height="400" loadDisplayMode="scaleToZoom" />
+            <Label id="postTitle" translation="[840,560]" width="960" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+            <ButtonGroup id="postBtns" translation="[840,640]" layoutDirection="horiz" itemSpacings="[18]" minWidth="300" iconUri="" focusedIconUri="" />
+            <Label text="Mais para ti" translation="[840,760]" font="font:SmallSystemFont" color="0xB4B7BFFF" />
+            <MarkupGrid id="postGrid" translation="[840,800]" itemComponentName="PosterItem" itemSize="[150,225]" itemSpacing="[18,0]" numColumns="6" numRows="1" vertFocusAnimationStyle="fixedFocus" />
+            <Label id="postCredits" text="Créditos" translation="[80,600]" font="font:SmallSystemFont" color="0x9A9DA6FF" />
+        </Group>
+        <Timer id="postTimer" duration="1" repeat="true" />
+
+        <!-- mini-guia da TV ao vivo: canal anterior, atual e seguinte com «agora / a seguir» -->
+        <Group id="chGuide" translation="[0,760]" visible="false">
+            <Rectangle width="1920" height="320" color="0x07080CE0" />
+            <Label id="cgPrev" translation="[100,26]" width="1720" font="font:SmallSystemFont" color="0x9A9DA6FF" />
+            <Label id="cgName" translation="[100,80]" width="1720" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+            <Label id="cgNow" translation="[100,140]" width="1720" font="font:MediumSystemFont" color="0xE6E7EAFF" />
+            <Label id="cgNext" translation="[100,220]" width="1720" font="font:SmallSystemFont" color="0x9A9DA6FF" />
+        </Group>
+        <Timer id="cgTimer" duration="5" repeat="false" />
+
+        <Timer id="osdTimer" duration="5" repeat="false" />
+        <Timer id="countTimer" duration="1" repeat="true" />
+        <Timer id="sleepTimer" duration="1800" repeat="false" />
+        <Timer id="graceTimer" duration="60" repeat="false" />
+        <Timer id="subWaitTimer" duration="3.5" repeat="false" />
+        <Timer id="startDog" duration="45" repeat="false" />
+        <Timer id="stallDog" duration="30" repeat="false" />
+        <Timer id="netTimer" duration="5" repeat="true" />
+        <MenuPanel id="menu" />
+    </children>
+</component>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="PhoneConfigScreen" extends="Group">
+    <interface>
+        <field id="changed" type="boolean" alwaysNotify="true" />
+        <field id="closing" type="boolean" onChange="onClosing" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.top.findNode("header").color = accentColor()
+        m.url = m.top.findNode("url")
+        m.status = m.top.findNode("status")
+        m.qr = m.top.findNode("qr")
+        ip = ""
+        addrs = CreateObject("roDeviceInfo").GetIPAddrs()
+        for each k in addrs
+            if ip = "" then ip = addrs[k]
+        end for
+        if ip = ""
+            m.status.text = "A Roku não tem endereço de rede — verifica a ligação Wi-Fi/cabo."
+            return
+        end if
+        link = "http://" + ip + ":8888"
+        m.url.text = link
+        m.qr.uri = "https://api.qrserver.com/v1/create-qr-code/?size=480x480&margin=10&data=" + urlEnc(link)
+        m.server = CreateObject("roSGNode", "ServerTask")
+        m.server.observeField("status", "onServerStatus")
+        m.server.observeField("changed", "onChanged")
+        m.server.control = "run"
+        m.log = []
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("PhoneConfigScreen.init", e)
+        end try
+    end sub
+
+    sub onServerStatus_x()
+        if m.server.status = "running"
+            m.status.text = "À espera… Abre o endereço no telemóvel (mesma rede Wi-Fi) ou lê o código QR."
+        else if m.server.status = "error"
+            m.status.text = "Não foi possível abrir o servidor na porta 8888."
+        end if
+    end sub
+    sub onServerStatus()
+        try
+            onServerStatus_x()
+        catch e
+            reportCrash("PhoneConfigScreen.onServerStatus", e)
+        end try
+    end sub
+
+    sub onChanged_x()
+        what = m.server.changed
+        names = { torbox: "Chave TorBox", addon: "Add-on", iptv: "Lista IPTV", tmdb: "Chave TMDB", trakt: "App Trakt", restore: "Cópia de segurança restaurada" }
+        label = what
+        if names.DoesExist(what) then label = names[what]
+        m.log.Unshift("Recebido: " + label)
+        while m.log.Count() > 6
+            m.log.Pop()
+        end while
+        m.status.text = m.log.Join(Chr(10))
+        m.top.changed = true
+    end sub
+    sub onChanged()
+        try
+            onChanged_x()
+        catch e
+            reportCrash("PhoneConfigScreen.onChanged", e)
+        end try
+    end sub
+
+    sub onClosing_x()
+        if m.server <> invalid then m.server.cancel = true
+    end sub
+    sub onClosing()
+        try
+            onClosing_x()
+        catch e
+            reportCrash("PhoneConfigScreen.onClosing", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Label id="header" text="Configurar pelo telemóvel" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label translation="[80,170]" width="1000" wrap="true" font="font:MediumSystemFont" color="0xE6E7EAFF"
+            text="1. Liga o telemóvel à mesma rede Wi-Fi da TV.&#10;2. Lê o código QR ou abre no navegador:" />
+        <Label id="url" translation="[80,320]" width="1000" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label translation="[80,420]" width="1000" wrap="true" font="font:SmallSystemFont" color="0x9A9DA6FF"
+            text="Na página podes colar a chave TorBox, add-ons, listas IPTV (com guia EPG), contas Xtream, chaves TMDB/Trakt e fazer cópia de segurança ou restauro das definições. Mantém este ecrã aberto enquanto configuras." />
+        <Label id="status" translation="[80,600]" width="1000" wrap="true" font="font:SmallSystemFont" color="0x1F9D55FF" text="A iniciar…" />
+        <Rectangle translation="[1260,170]" width="540" height="540" color="0xFFFFFFFF" />
+        <Poster id="qr" translation="[1280,190]" width="500" height="500" loadDisplayMode="scaleToFit" />
+    </children>
+</component>

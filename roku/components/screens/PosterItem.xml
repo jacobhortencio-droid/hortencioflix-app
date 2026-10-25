@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Cartaz com zoom e moldura no foco, imagem a aparecer com fade e barra de progresso -->
+<component name="PosterItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="width" type="float" onChange="layout" />
+        <field id="height" type="float" onChange="layout" />
+        <field id="focusPercent" type="float" onChange="onFocus" />
+        <field id="rowFocusPercent" type="float" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="rowListHasFocus" type="boolean" onChange="onFocus" />
+        <field id="gridHasFocus" type="boolean" onChange="onFocus" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.g = m.top.findNode("g")
+        m.border = m.top.findNode("border")
+        m.ph = m.top.findNode("ph")
+        m.poster = m.top.findNode("poster")
+        m.label = m.top.findNode("label")
+        m.barBg = m.top.findNode("barBg")
+        m.bar = m.top.findNode("bar")
+        m.fade = m.top.findNode("fade")
+        m.poster.observeField("loadStatus", "onLoad")
+        accent = "0xE50914FF"
+        if m.global.hasField("accent") and m.global.accent <> invalid and m.global.accent <> "" then accent = m.global.accent
+        m.border.color = accent
+        m.bar.color = accent
+        layout()
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("PosterItem.init", e)
+        end try
+    end sub
+
+    sub layout_x()
+        w = m.top.width
+        h = m.top.height
+        if w <= 0 then w = 180
+        if h <= 0 then h = 270
+        m.border.translation = [-5, -5]
+        m.border.width = w + 10
+        m.border.height = h + 10
+        m.ph.width = w
+        m.ph.height = h
+        m.poster.width = w
+        m.poster.height = h
+        m.label.width = w - 20
+        m.label.height = h - 20
+        m.barBg.translation = [4, h - 14]
+        m.barBg.width = w - 8
+        m.g.scaleRotateCenter = [w / 2, h / 2]
+        m.barWidth = w - 8
+    end sub
+    sub layout()
+        try
+            layout_x()
+        catch e
+            reportCrash("PosterItem.layout", e)
+        end try
+    end sub
+
+    sub onContent_x()
+        c = m.top.itemContent
+        if c = invalid then return
+        m.label.text = c.title
+        if m.poster.uri = c.HDPosterUrl and m.poster.loadStatus = "ready"
+            m.poster.opacity = 1
+        else
+            m.poster.opacity = 0
+            m.poster.uri = c.HDPosterUrl
+        end if
+        p = 0.0
+        if c.hasField("progress") then p = c.progress
+        if p > 0.01
+            if p > 1 then p = 1
+            m.barBg.visible = true
+            m.bar.width = Int(m.barWidth * p)
+        else
+            m.barBg.visible = false
+        end if
+    end sub
+    sub onContent()
+        try
+            onContent_x()
+        catch e
+            reportCrash("PosterItem.onContent", e)
+        end try
+    end sub
+
+    sub onLoad_x()
+        if m.poster.loadStatus = "ready"
+            m.fade.control = "start"
+        end if
+    end sub
+    sub onLoad()
+        try
+            onLoad_x()
+        catch e
+            reportCrash("PosterItem.onLoad", e)
+        end try
+    end sub
+
+    sub onFocus_x()
+        f = m.top.focusPercent
+        if not m.top.rowListHasFocus and not m.top.gridHasFocus then f = 0
+        s = 1.0 + 0.07 * f
+        m.g.scale = [s, s]
+        m.border.opacity = f
+    end sub
+    sub onFocus()
+        try
+            onFocus_x()
+        catch e
+            reportCrash("PosterItem.onFocus", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Group id="g">
+            <Rectangle id="border" width="190" height="280" opacity="0" />
+            <Rectangle id="ph" width="180" height="270" color="0x23262FFF" />
+            <Label id="label" translation="[10,10]" width="160" height="250" wrap="true"
+                horizAlign="center" vertAlign="center" font="font:SmallestSystemFont" color="0xC8CAD0FF" />
+            <Poster id="poster" width="180" height="270" loadDisplayMode="scaleToFill" opacity="0" />
+            <Rectangle id="barBg" width="172" height="10" color="0x000000CC" visible="false">
+                <Rectangle id="bar" width="0" height="10" />
+            </Rectangle>
+        </Group>
+        <Animation id="fade" duration="0.35" easeFunction="outQuad">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="poster.opacity" />
+        </Animation>
+    </children>
+</component>

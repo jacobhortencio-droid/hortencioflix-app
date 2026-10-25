@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SettingsScreen" extends="Group">
+    <interface>
+        <field id="changed" type="boolean" alwaysNotify="true" />
+        <field id="action" type="string" alwaysNotify="true" />
+        <field id="refresh" type="boolean" alwaysNotify="true" onChange="render" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/SettingsScreen.brs" />
+    <children>
+        <Label id="header" text="Definições" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <LabelList id="list" translation="[80,170]" itemSize="[1100,62]" numRows="14"
+            vertFocusAnimationStyle="floatingFocus" color="0xE6E7EAFF" focusedColor="0x0F1014FF"
+            font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" />
+        <Label id="help" translation="[1260,170]" width="580" wrap="true" font="font:SmallSystemFont" color="0x8A8D96FF" />
+        <MenuPanel id="menu" />
+    </children>
+</component>

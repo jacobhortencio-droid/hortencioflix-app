@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="HomeScreen" extends="Group">
+    <interface>
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="menuSelected" type="string" alwaysNotify="true" />
+        <field id="reloadRequest" type="boolean" alwaysNotify="true" onChange="load" />
+        <field id="refreshLocal" type="boolean" alwaysNotify="true" onChange="render" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/HomeScreen.brs" />
+    <children>
+        <!-- destaque: imagem de fundo do título focado -->
+        <Poster id="heroBg" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0" />
+        <Poster uri="pkg:/images/grad_left.png" width="1920" height="1080" />
+        <Poster uri="pkg:/images/grad_bottom.png" width="1920" height="1080" />
+
+        <Label id="logo" text="Hortêncioflix" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <ButtonGroup id="menu" translation="[560,34]" layoutDirection="horiz" itemSpacings="[8]" minWidth="180" maxWidth="250"
+            iconUri="" focusedIconUri="" textFont="font:SmallSystemFont" focusedTextFont="font:SmallBoldSystemFont"
+            buttons="[&quot;Explorar&quot;, &quot;Pesquisar&quot;, &quot;TV ao vivo&quot;, &quot;TorBox&quot;, &quot;Definições&quot;]" />
+
+        <Poster id="heroLogo" translation="[80,150]" width="620" height="180" loadDisplayMode="scaleToFit" />
+        <Label id="heroTitle" translation="[80,200]" width="1100" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="heroInfo" translation="[80,345]" width="1100" font="font:SmallSystemFont" color="0xC8CAD0FF" />
+        <Label id="heroDesc" translation="[80,392]" width="960" wrap="true" maxLines="3" font="font:SmallSystemFont" color="0xE6E7EAFF" />
+
+        <SkeletonRows id="skeleton" translation="[80,540]" />
+        <RowList id="rows" translation="[80,540]" itemComponentName="PosterItem"
+            numRows="2" itemSize="[1760,360]" rowItemSize="[[180,270]]" rowItemSpacing="[[22,0]]"
+            itemSpacing="[0,10]" showRowLabel="[true]" rowLabelOffset="[[0,14]]" drawFocusFeedback="false"
+            rowLabelColor="0xE6E7EAFF" rowFocusAnimationStyle="floatingFocus"
+            vertFocusAnimationStyle="fixedFocus" />
+        <Label id="status" translation="[0,760]" width="1920" horizAlign="center" font="font:MediumSystemFont"
+            color="0xC8CAD0FF" visible="false" />
+        <!-- avatar do perfil: inicial sobre a cor do perfil -->
+        <Rectangle id="avatar" translation="[1820,40]" width="56" height="56" color="0xE50914FF" />
+        <Label id="avatarLetter" translation="[1820,40]" width="56" height="56" horizAlign="center" vertAlign="center" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="account" translation="[1000,1040]" width="880" horizAlign="right" font="font:SmallestSystemFont" color="0x6E717AFF" />
+
+        <Timer id="heroTimer" duration="0.35" repeat="false" />
+        <Animation id="heroFade" duration="0.6" easeFunction="outQuad">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="heroBg.opacity" />
+        </Animation>
+    </children>
+</component>

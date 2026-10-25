@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hortencioflix" parent="@style/Theme.Leanback">
+        <item name="hfBg">@color/bg</item>
+        <item name="hfBgSolid">@color/bg</item>
+        <item name="hfPanel">@color/panel</item>
+        <item name="hfPanel2">@color/panel2</item>
+        <item name="hfText">@color/text</item>
+        <item name="hfMuted">@color/muted</item>
+        <item name="hfStroke">#22FFFFFF</item>
+        <item name="hfOverlay">#2EFFFFFF</item>
+        <item name="hfFocus">#FFFFFF</item>
+        <item name="hfCardStroke">#00000000</item>
+        <item name="hfFadeA">#000B0B0F</item>
+        <item name="hfFadeB">#990B0B0F</item>
+        <item name="hfFadeC">#FF0B0B0F</item>
+        <item name="hfFadeD">#660B0B0F</item>
+        <item name="hfFadeE">#CC0B0B0F</item>
+        <item name="hfFadeF">#F20B0B0F</item>
+        <item name="hfAccent">@color/accent</item>
+        <item name="hfAccentDark">@color/accent_dark</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorAccent">?attr/hfAccent</item>
+        <item name="android:colorPrimary">?attr/hfAccent</item>
+        <item name="android:colorControlActivated">?attr/hfAccent</item>
+        <item name="android:textColorHighlight">#66E3122B</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:fontFamily">@font/hf_body</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowAnimationStyle">@style/HfWindowAnim</item>
+    </style>
+
+    <!-- Preto puro para ecrãs OLED -->
+    <style name="Theme.Hortencioflix.Amoled">
+        <item name="hfBg">@color/amoled_bg</item>
+        <item name="hfBgSolid">@color/amoled_bg</item>
+        <item name="hfPanel">@color/amoled_panel</item>
+        <item name="hfPanel2">#17171C</item>
+        <item name="hfText">@color/text</item>
+        <item name="hfMuted">@color/muted</item>
+        <item name="hfStroke">#22FFFFFF</item>
+        <item name="hfOverlay">#2EFFFFFF</item>
+        <item name="hfFocus">#FFFFFF</item>
+        <item name="hfCardStroke">#00000000</item>
+        <item name="hfFadeA">#00000000</item>
+        <item name="hfFadeB">#99000000</item>
+        <item name="hfFadeC">#FF000000</item>
+        <item name="hfFadeD">#66000000</item>
+        <item name="hfFadeE">#CC000000</item>
+        <item name="hfFadeF">#F2000000</item>
+
+        <item name="android:windowBackground">@color/amoled_bg</item>
+        <item name="android:statusBarColor">@color/amoled_bg</item>
+        <item name="android:navigationBarColor">@color/amoled_bg</item>
+    </style>
+
+    <!-- Claro: fundo claro, texto escuro -->
+    <style name="Theme.Hortencioflix.Light">
+        <item name="hfBg">#F2F3F7</item>
+        <item name="hfBgSolid">#F2F3F7</item>
+        <item name="hfPanel">#FFFFFF</item>
+        <item name="hfPanel2">#E8E9EF</item>
+        <item name="hfText">#15161B</item>
+        <item name="hfMuted">#5C606C</item>
+        <item name="hfStroke">#1F000000</item>
+        <item name="hfOverlay">#14000000</item>
+        <item name="hfFocus">?attr/hfAccent</item>
+        <item name="hfCardStroke">#14000000</item>
+        <item name="hfFadeA">#00F2F3F7</item>
+        <item name="hfFadeB">#99F2F3F7</item>
+        <item name="hfFadeC">#FFF2F3F7</item>
+        <item name="hfFadeD">#66F2F3F7</item>
+        <item name="hfFadeE">#CCF2F3F7</item>
+        <item name="hfFadeF">#F2F2F3F7</item>
+        <item name="android:windowBackground">#F2F3F7</item>
+        <item name="android:statusBarColor">#F2F3F7</item>
+        <item name="android:navigationBarColor">#F2F3F7</item>
+        <item name="android:textColorHighlight">#33E3122B</item>
+    </style>
+
+    <!-- Vidro («liquid glass»): fundo colorido desfocado e painéis translúcidos com contorno claro -->
+    <style name="Theme.Hortencioflix.Glass">
+        <item name="hfBg">#00000000</item>
+        <item name="hfBgSolid">#0D1124</item>
+        <item name="hfPanel">#24FFFFFF</item>
+        <item name="hfPanel2">#33FFFFFF</item>
+        <item name="hfText">#FFFFFF</item>
+        <item name="hfMuted">#D9FFFFFF</item>
+        <item name="hfStroke">#40FFFFFF</item>
+        <item name="hfOverlay">#2EFFFFFF</item>
+        <item name="hfFocus">#FFFFFF</item>
+        <item name="hfCardStroke">#38FFFFFF</item>
+        <item name="hfFadeA">#000D1124</item>
+        <item name="hfFadeB">#800D1124</item>
+        <item name="hfFadeC">#E60D1124</item>
+        <item name="hfFadeD">#4D0D1124</item>
+        <item name="hfFadeE">#B30D1124</item>
+        <item name="hfFadeF">#E60D1124</item>
+        <item name="android:windowBackground">@drawable/glass_wallpaper</item>
+        <item name="android:statusBarColor">#0D1124</item>
+        <item name="android:navigationBarColor">#0D1124</item>
+    </style>
+
+    <style name="HfWindowAnim" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/hf_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/hf_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/hf_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/hf_close_exit</item>
+    </style>
+
+    <style name="HfTitle">
+        <item name="android:fontFamily">@font/hf_display</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/hfText</item>
+    </style>
+
+    <style name="HfButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginEnd">12dp</item>
+        <item name="android:background">@drawable/item_bg</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:paddingStart">22dp</item>
+        <item name="android:paddingEnd">22dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:textColor">?attr/hfText</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:stateListAnimator">@animator/press_soft</item>
+    </style>
+
+    <style name="PlayerChip">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:background">@drawable/chip_dark</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:stateListAnimator">@animator/press_soft</item>
+    </style>
+
+    <style name="HfDialog" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">@font/hf_body</item>
+        <item name="android:windowBackground">@drawable/dialog_bg</item>
+        <item name="android:colorBackground">?attr/hfPanel</item>
+        <item name="android:colorAccent">?attr/hfAccent</item>
+        <item name="android:colorPrimary">?attr/hfAccent</item>
+        <item name="android:textColorPrimary">?attr/hfText</item>
+        <item name="android:textColorSecondary">?attr/hfMuted</item>
+        <item name="android:textColor">?attr/hfText</item>
+        <item name="android:buttonBarButtonStyle">@style/HfDialogButton</item>
+    </style>
+
+    <style name="HfDialog.Light" parent="@android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:fontFamily">@font/hf_body</item>
+        <item name="android:windowBackground">@drawable/dialog_bg</item>
+        <item name="android:colorBackground">?attr/hfPanel</item>
+        <item name="android:colorAccent">?attr/hfAccent</item>
+        <item name="android:colorPrimary">?attr/hfAccent</item>
+        <item name="android:textColorPrimary">?attr/hfText</item>
+        <item name="android:textColorSecondary">?attr/hfMuted</item>
+        <item name="android:textColor">?attr/hfText</item>
+        <item name="android:buttonBarButtonStyle">@style/HfDialogButton</item>
+    </style>
+
+    <style name="HfDialog.Glass">
+        <item name="android:windowBackground">@drawable/dialog_glass</item>
+        <item name="android:colorBackground">#00000000</item>
+        <item name="android:backgroundDimAmount">0.2</item>
+    </style>
+
+    <style name="HfDialogButton" parent="@android:style/Widget.Material.Button.Borderless.Colored">
+        <item name="android:textColor">?attr/hfAccent</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="ToggleChip">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@drawable/chip_toggle</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:textColor">?attr/hfText</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:stateListAnimator">@animator/press_soft</item>
+    </style>
+
+    <style name="Accent_Blue">
+        <item name="hfAccent">#2F7BFF</item>
+        <item name="hfAccentDark">#1B55C4</item>
+        <item name="android:colorAccent">#2F7BFF</item>
+        <item name="android:colorPrimary">#2F7BFF</item>
+        <item name="android:colorControlActivated">#2F7BFF</item>
+    </style>
+
+    <style name="Accent_Green">
+        <item name="hfAccent">#22C55E</item>
+        <item name="hfAccentDark">#15803D</item>
+        <item name="android:colorAccent">#22C55E</item>
+        <item name="android:colorPrimary">#22C55E</item>
+        <item name="android:colorControlActivated">#22C55E</item>
+    </style>
+
+    <style name="Accent_Violet">
+        <item name="hfAccent">#8B5CF6</item>
+        <item name="hfAccentDark">#6D3FD6</item>
+        <item name="android:colorAccent">#8B5CF6</item>
+        <item name="android:colorPrimary">#8B5CF6</item>
+        <item name="android:colorControlActivated">#8B5CF6</item>
+    </style>
+
+    <style name="Accent_Orange">
+        <item name="hfAccent">#F97316</item>
+        <item name="hfAccentDark">#C2570C</item>
+        <item name="android:colorAccent">#F97316</item>
+        <item name="android:colorPrimary">#F97316</item>
+        <item name="android:colorControlActivated">#F97316</item>
+    </style>
+</resources>

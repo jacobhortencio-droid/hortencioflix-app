@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Indicador de carregamento da marca: três barras a «tocar» (igual ao Android). Usa-se como o BusySpinner: control = "start" / "stop" -->
+<component name="HfLoader" extends="Group">
+    <interface>
+        <field id="control" type="string" onChange="onControl" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init()
+        try
+            for i = 0 to 2
+                b = m.top.findNode("b" + i.ToStr())
+                b.scaleRotateCenter = [14, 45]
+            end for
+        catch e
+            reportCrash("HfLoader.init", e)
+        end try
+    end sub
+
+    sub onControl()
+        try
+            c = m.top.control
+            for i = 0 to 2
+                a = m.top.findNode("a" + i.ToStr())
+                if c = "start" then a.control = "start" else a.control = "stop"
+            end for
+        catch e
+            reportCrash("HfLoader.onControl", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Poster id="b0" uri="pkg:/images/loader_bar.png" width="28" height="90" translation="[0,0]" scale="[1,0.4]" />
+        <Poster id="b1" uri="pkg:/images/loader_bar.png" width="28" height="90" translation="[42,0]" scale="[1,0.4]" />
+        <Poster id="b2" uri="pkg:/images/loader_bar.png" width="28" height="90" translation="[84,0]" scale="[1,0.4]" />
+        <Animation id="a0" duration="0.9" repeat="true" easeFunction="inOutQuad">
+            <Vector2DFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[[1,0.35],[1,1.0],[1,0.35]]" fieldToInterp="b0.scale" />
+        </Animation>
+        <Animation id="a1" duration="0.9" repeat="true" easeFunction="inOutQuad">
+            <Vector2DFieldInterpolator key="[0.0, 0.2, 0.7, 1.0]" keyValue="[[1,0.6],[1,0.35],[1,1.0],[1,0.6]]" fieldToInterp="b1.scale" />
+        </Animation>
+        <Animation id="a2" duration="0.9" repeat="true" easeFunction="inOutQuad">
+            <Vector2DFieldInterpolator key="[0.0, 0.4, 0.9, 1.0]" keyValue="[[1,1.0],[1,0.35],[1,1.0],[1,0.9]]" fieldToInterp="b2.scale" />
+        </Animation>
+    </children>
+</component>

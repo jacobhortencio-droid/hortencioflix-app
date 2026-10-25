@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Ligar a conta Trakt com um código (device flow) -->
+<component name="TraktLinkScreen" extends="Group">
+    <interface>
+        <field id="linked" type="boolean" alwaysNotify="true" />
+        <field id="closing" type="boolean" onChange="onClosing" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.top.findNode("header").color = accentColor()
+        m.steps = m.top.findNode("steps")
+        m.code = m.top.findNode("code")
+        m.status = m.top.findNode("status")
+        m.clientId = cfgRead("traktId", "")
+        m.secret = cfgRead("traktSecret", "")
+        if m.clientId = "" or m.secret = ""
+            m.steps.text = "Primeiro cria uma app gratuita em trakt.tv/oauth/applications (Redirect URI: urn:ietf:wg:oauth:2.0:oob) e cola o Client ID e o Client Secret em Definições → Configurar pelo telemóvel."
+            return
+        end if
+        t = CreateObject("roSGNode", "TraktTask")
+        t.request = { kind: "code", clientId: m.clientId }
+        t.observeField("result", "onCode")
+        t.control = "run"
+        m.codeTask = t
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("TraktLinkScreen.init", e)
+        end try
+    end sub
+
+    sub onCode_x(event as object)
+        res = event.getData()
+        if not res.ok
+            m.status.text = res.error
+            return
+        end if
+        m.steps.text = "1. No telemóvel ou computador, abre:" + Chr(10) + res.url + Chr(10) + Chr(10) + "2. Inicia sessão no Trakt e escreve este código:"
+        m.code.text = res.userCode
+        m.status.text = "A aguardar confirmação…"
+        m.pollTask = CreateObject("roSGNode", "TraktTask")
+        m.pollTask.request = { kind: "poll", clientId: m.clientId, clientSecret: m.secret, deviceCode: res.deviceCode, interval: res.interval }
+        m.pollTask.observeField("result", "onToken")
+        m.pollTask.control = "run"
+    end sub
+    sub onCode(event as object)
+        try
+            onCode_x(event)
+        catch e
+            reportCrash("TraktLinkScreen.onCode", e)
+        end try
+    end sub
+
+    sub onToken_x(event as object)
+        res = event.getData()
+        if res.ok
+            cfgWrite("traktToken", res.token)
+            cfgWrite("traktRefresh", res.refresh)
+            cfgWrite("traktExpires", strOr(res.expires))
+            m.status.text = "Trakt ligado!"
+            m.top.linked = true
+        else if strOr(res.error) <> "cancelado"
+            m.status.text = strOr(res.error)
+        end if
+    end sub
+    sub onToken(event as object)
+        try
+            onToken_x(event)
+        catch e
+            reportCrash("TraktLinkScreen.onToken", e)
+        end try
+    end sub
+
+    sub onClosing_x()
+        if m.pollTask <> invalid then m.pollTask.cancel = true
+    end sub
+    sub onClosing()
+        try
+            onClosing_x()
+        catch e
+            reportCrash("TraktLinkScreen.onClosing", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Label id="header" text="Ligar Trakt" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label id="steps" translation="[80,170]" width="1500" wrap="true" font="font:MediumSystemFont" color="0xE6E7EAFF" />
+        <Label id="code" translation="[80,520]" width="1500" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="status" translation="[80,640]" width="1500" wrap="true" font="font:SmallSystemFont" color="0x8A8D96FF" />
+    </children>
+</component>

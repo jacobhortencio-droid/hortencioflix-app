@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="IptvScreen" extends="Group">
+    <interface>
+        <field id="start" type="boolean" onChange="onStart" />
+        <field id="playRequest" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/IptvScreen.brs" />
+    <children>
+        <Label id="header" text="TV ao vivo" translation="[80,48]" width="1200" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label id="summary" translation="[80,112]" width="1760" font="font:SmallSystemFont" color="0x8A8D96FF" />
+        <Rectangle translation="[60,160]" width="580" height="840" color="0x181A20FF" />
+        <LabelList id="groups" translation="[80,180]" itemSize="[540,56]" numRows="14"
+            vertFocusAnimationStyle="floatingFocus" color="0xC8CAD0FF" focusedColor="0x0F1014FF"
+            font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" />
+        <MarkupList id="channels" translation="[680,176]" itemComponentName="ChannelItem" itemSize="[1180,72]"
+            itemSpacing="[0,4]" numRows="11" vertFocusAnimationStyle="floatingFocus" />
+        <Label id="status" translation="[700,480]" width="1140" wrap="true" font="font:MediumSystemFont" color="0xC8CAD0FF" />
+        <Label id="hint" translation="[80,1020]" width="1760" font="font:SmallestSystemFont" color="0x6E717AFF"
+            text="OK em «Listas» para mudar de fonte · * num canal: favoritos, guia, n.º do canal, verificar offline · No canal: Cima/Baixo muda" />
+        <Label id="epg" translation="[680,975]" width="1180" font="font:SmallSystemFont" color="0xE6E7EAFF" />
+        <Timer id="epgTimer" duration="0.7" repeat="false" />
+        <MenuPanel id="menu" />
+    </children>
+</component>

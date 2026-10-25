@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Pequeno servidor web na rede local para configurar a app pelo telemóvel -->
+<component name="ServerTask" extends="Task">
+    <interface>
+        <field id="port" type="integer" value="8888" />
+        <field id="status" type="string" />
+        <field id="changed" type="string" alwaysNotify="true" />
+        <field id="cancel" type="boolean" />
+        <!-- true: só responde à sincronização com a app Android (nunca expõe chaves nem definições) -->
+        <field id="syncOnly" type="boolean" value="false" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/ServerTask.brs" />
+</component>

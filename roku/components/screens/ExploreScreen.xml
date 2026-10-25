@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Explorar: listas e géneros (Cinemeta), em grelha com carregamento contínuo -->
+<component name="ExploreScreen" extends="Group">
+    <interface>
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript" uri="pkg:/components/screens/ExploreScreen.brs" />
+    <children>
+        <Label id="header" text="Explorar" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label id="focusTitle" translation="[600,120]" width="1240" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Rectangle translation="[60,160]" width="480" height="860" color="0x181A20FF" />
+        <LabelList id="cats" translation="[80,180]" itemSize="[440,54]" numRows="15"
+            vertFocusAnimationStyle="floatingFocus" color="0xC8CAD0FF" focusedColor="0x0F1014FF"
+            font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" />
+        <MarkupGrid id="grid" translation="[600,190]" itemComponentName="PosterItem" itemSize="[180,270]"
+            itemSpacing="[22,40]" numColumns="6" numRows="3" drawFocusFeedback="false"
+            vertFocusAnimationStyle="floatingFocus" />
+        <SkeletonRows id="skeleton" translation="[600,150]" visible="false" />
+        <Label text="✱  nota mínima IMDb (6+, 7+, 8+)" translation="[80,1020]" font="font:SmallestSystemFont" color="0x6E717AFF" />
+        <Label id="status" translation="[600,500]" width="1240" wrap="true" font="font:MediumSystemFont" color="0xC8CAD0FF" />
+    </children>
+</component>

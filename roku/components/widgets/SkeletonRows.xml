@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Cartazes "fantasma" a pulsar enquanto os catálogos carregam -->
+<component name="SkeletonRows" extends="Group">
+    <interface>
+        <field id="rows" type="integer" value="2" onChange="build" />
+        <field id="itemWidth" type="integer" value="180" />
+        <field id="itemHeight" type="integer" value="270" />
+        <field id="active" type="boolean" value="true" onChange="onActive" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.sk = m.top.findNode("sk")
+        m.pulse = m.top.findNode("pulse")
+        build()
+        m.pulse.control = "start"
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("SkeletonRows.init", e)
+        end try
+    end sub
+
+    sub build_x()
+        while m.sk.getChildCount() > 0
+            m.sk.removeChildIndex(0)
+        end while
+        w = m.top.itemWidth
+        h = m.top.itemHeight
+        for r = 0 to m.top.rows - 1
+            y = r * (h + 90)
+            bar = m.sk.createChild("Rectangle")
+            bar.translation = [0, y]
+            bar.width = 320
+            bar.height = 26
+            bar.color = "0x2A2D36FF"
+            for i = 0 to 8
+                rc = m.sk.createChild("Rectangle")
+                rc.translation = [i * (w + 20), y + 44]
+                rc.width = w
+                rc.height = h
+                rc.color = "0x23262FFF"
+            end for
+        end for
+    end sub
+    sub build()
+        try
+            build_x()
+        catch e
+            reportCrash("SkeletonRows.build", e)
+        end try
+    end sub
+
+    sub onActive_x()
+        if m.top.active
+            m.pulse.control = "start"
+        else
+            m.pulse.control = "stop"
+        end if
+    end sub
+    sub onActive()
+        try
+            onActive_x()
+        catch e
+            reportCrash("SkeletonRows.onActive", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Group id="sk" />
+        <Animation id="pulse" duration="1.3" repeat="true" easeFunction="linear">
+            <FloatFieldInterpolator key="[0.0, 0.5, 1.0]" keyValue="[0.35, 0.85, 0.35]" fieldToInterp="sk.opacity" />
+        </Animation>
+    </children>
+</component>

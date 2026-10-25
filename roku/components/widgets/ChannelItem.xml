@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Linha de canal IPTV com logótipo -->
+<component name="ChannelItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="width" type="float" />
+        <field id="height" type="float" />
+        <field id="focusPercent" type="float" onChange="onFocus" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="listHasFocus" type="boolean" onChange="onFocus" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.logo = m.top.findNode("logo")
+        m.name = m.top.findNode("name")
+        m.fav = m.top.findNode("fav")
+        m.now = m.top.findNode("now")
+        m.off = m.top.findNode("off")
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("ChannelItem.init", e)
+        end try
+    end sub
+
+    sub onContent_x()
+        c = m.top.itemContent
+        if c = invalid then return
+        m.name.text = c.title
+        m.logo.uri = c.HDPosterUrl
+        m.fav.visible = (c.shortDescriptionLine2 = "fav")
+        m.off.visible = (c.shortDescriptionLine1 = "off")
+        m.now.text = c.description
+        if c.description <> ""
+            m.name.translation = [136, 4]
+            m.name.height = 40
+        else
+            m.name.translation = [136, 0]
+            m.name.height = 72
+        end if
+        onFocus()
+    end sub
+    sub onContent()
+        try
+            onContent_x()
+        catch e
+            reportCrash("ChannelItem.onContent", e)
+        end try
+    end sub
+
+    sub onFocus_x()
+        if m.top.focusPercent > 0.5 and m.top.listHasFocus
+            m.name.color = "0x0F1014FF"
+            m.now.color = "0x2A2D36FF"
+        else
+            m.name.color = "0xE6E7EAFF"
+            m.now.color = "0x9A9DA6FF"
+        end if
+    end sub
+    sub onFocus()
+        try
+            onFocus_x()
+        catch e
+            reportCrash("ChannelItem.onFocus", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Rectangle translation="[12,8]" width="104" height="56" color="0x23262FFF" />
+        <Poster id="logo" translation="[14,10]" width="100" height="52" loadDisplayMode="scaleToFit" />
+        <Label id="name" translation="[136,0]" width="880" height="72" vertAlign="center" font="font:SmallSystemFont" />
+        <Label id="now" translation="[136,40]" width="880" height="30" font="font:SmallestSystemFont" />
+        <Rectangle id="off" translation="[970,22]" width="80" height="28" color="0x4A4E5AFF" visible="false">
+            <Label width="80" height="28" horizAlign="center" vertAlign="center" text="OFF" font="font:SmallestBoldSystemFont" color="0xFFFFFFFF" />
+        </Rectangle>
+        <Rectangle id="fav" translation="[1060,22]" width="70" height="28" color="0xE50914FF" visible="false">
+            <Label width="70" height="28" horizAlign="center" vertAlign="center" text="FAV" font="font:SmallestBoldSystemFont" color="0xFFFFFFFF" />
+        </Rectangle>
+    </children>
+</component>

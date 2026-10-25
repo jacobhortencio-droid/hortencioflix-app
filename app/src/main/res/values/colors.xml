@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Identidade Hortêncioflix: vermelho, tinta e dourado (cores de Angola) -->
+    <color name="bg">#0B0B0F</color>
+    <color name="panel">#16161D</color>
+    <color name="panel2">#1F1F28</color>
+    <color name="accent">#E3122B</color>
+    <color name="accent_dark">#B00D21</color>
+    <color name="gold">#FFB319</color>
+    <color name="text">#F2F2F5</color>
+    <color name="muted">#9C9CAB</color>
+    <color name="ok">#22C55E</color>
+    <color name="warn">#F97316</color>
+    <color name="icon_bg">#14141A</color>
+    <color name="amoled_bg">#000000</color>
+    <color name="amoled_panel">#0E0E12</color>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Proteção de ecrã da Roku (enquanto a app está aberta): usa o mesmo modo ambiente, sem teclas -->
+<component name="HfScreensaver" extends="Scene">
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init()
+        m.top.backgroundColor = "0x000000FF"
+        m.top.backgroundURI = ""
+    end sub
+    ]]>
+    </script>
+    <children>
+        <AmbientView id="amb" />
+    </children>
+</component>

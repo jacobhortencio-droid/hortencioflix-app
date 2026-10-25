@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Hortêncioflix</string>
+    <string name="sc_live">TV ao vivo</string>
+    <string name="sc_live_long">Abrir a TV ao vivo</string>
+    <string name="sc_search">Pesquisa</string>
+    <string name="sc_search_long">Pesquisar filmes e séries</string>
+</resources>

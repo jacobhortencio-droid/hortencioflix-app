@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Modo ambiente / proteção de ecrã: as imagens de fundo do que estás a ver, da biblioteca e dos catálogos
+  do Início, a passar devagar (movimento de câmara + transição suave), com o título e as horas.
+  Dentro da app (interactive): OK abre e começa a ver o título que está a passar; outra tecla sai.
+-->
+<component name="AmbientView" extends="Group">
+    <interface>
+        <!-- o título escolhido com OK: { id, type, name } -->
+        <field id="chosen" type="assocarray" alwaysNotify="true" />
+        <field id="dismiss" type="boolean" alwaysNotify="true" />
+        <!-- true = dentro da app (aceita teclas); false = proteção de ecrã da Roku -->
+        <field id="interactive" type="boolean" value="false" onChange="onInteractive" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init()
+        try
+            m.a = m.top.findNode("a")
+            m.b = m.top.findNode("b")
+            m.a.scaleRotateCenter = [960, 540]
+            m.b.scaleRotateCenter = [960, 540]
+            m.title = m.top.findNode("title")
+            m.sub = m.top.findNode("sub")
+            m.clock = m.top.findNode("clock")
+            m.fadeIn = m.top.findNode("fadeIn")
+            m.driftA = m.top.findNode("driftA")
+            m.driftB = m.top.findNode("driftB")
+            m.timer = m.top.findNode("timer")
+            m.timer.observeField("fire", "nextImage")
+            m.clockTimer = m.top.findNode("clockTimer")
+            m.clockTimer.observeField("fire", "updateClock")
+            m.items = collect()
+            m.i = -1
+            m.front = m.a
+            updateClock()
+            nextImage()
+            m.timer.control = "start"
+            m.clockTimer.control = "start"
+        catch e
+            reportCrash("HfScreensaver.init", e)
+        end try
+    end sub
+
+    ' Junta títulos com imagem de fundo: «Continuar a ver», biblioteca e catálogos guardados do Início
+    function collect() as object
+        out = []
+        seen = {}
+        src = []
+        src.Append(continueRowItems())
+        src.Append(libraryRowItems())
+        raw = ReadAsciiFile("cachefs:/home_rows.json")
+        if raw <> ""
+            rows = ParseJson(raw)
+            if rows <> invalid and type(rows) = "roArray"
+                for each r in rows
+                    if r.items <> invalid and type(r.items) = "roArray" then src.Append(r.items)
+                end for
+            end if
+        end if
+        for each x in src
+            id = strOr(x.id)
+            if Left(id, 2) = "tt"
+                id = id.Split(":")[0]
+                if not seen.DoesExist(id) and out.Count() < 80
+                    seen[id] = true
+                    out.Push({ id: id, bg: "https://images.metahub.space/background/large/" + id + "/img", name: strOr(x.name), kind: strOr(x.type) })
+                end if
+            end if
+        end for
+        ' baralhar
+        for i = out.Count() - 1 to 1 step -1
+            j = Rnd(i + 1) - 1
+            t = out[i]
+            out[i] = out[j]
+            out[j] = t
+        end for
+        return out
+    end function
+
+    sub nextImage()
+        try
+            if m.items.Count() = 0
+                m.title.text = "Hortêncioflix"
+                m.sub.text = ""
+                return
+            end if
+            m.i = (m.i + 1) mod m.items.Count()
+            it = m.items[m.i]
+            ' a imagem nova entra por cima da anterior, com fade, e começa o seu movimento lento
+            old = m.front
+            if m.front.isSameNode(m.a)
+                m.front = m.b
+                drift = m.driftB
+            else
+                m.front = m.a
+                drift = m.driftA
+            end if
+            m.front.opacity = 0
+            m.front.uri = it.bg
+            ' transição cruzada: a nova aparece enquanto a anterior desaparece
+            m.fadeIn.control = "stop"
+            m.fadeIn.getChild(0).fieldToInterp = m.front.id + ".opacity"
+            m.fadeIn.getChild(1).fieldToInterp = old.id + ".opacity"
+            m.fadeIn.control = "start"
+            drift.control = "stop"
+            drift.control = "start"
+            m.title.text = it.name
+            k = "Filme"
+            if it.kind = "series" then k = "Série"
+            m.sub.text = k
+        catch e
+            reportCrash("HfScreensaver.nextImage", e)
+        end try
+    end sub
+
+    sub onInteractive()
+        m.top.findNode("hint").visible = m.top.interactive
+    end sub
+
+    function onKeyEvent(key as string, press as boolean) as boolean
+        if not press or not m.top.interactive then return false
+        if key = "OK" or key = "play"
+            if m.items.Count() > 0 and m.i >= 0
+                it = m.items[m.i]
+                m.top.chosen = { id: it.id, type: it.kind, name: it.name }
+                return true
+            end if
+        end if
+        if key = "right" and m.items.Count() > 0
+            m.timer.control = "stop"
+            nextImage()
+            m.timer.control = "start"
+            return true
+        end if
+        m.top.dismiss = true
+        return true
+    end function
+
+    sub updateClock()
+        dt = CreateObject("roDateTime")
+        dt.ToLocalTime()
+        h = dt.GetHours()
+        mi = dt.GetMinutes()
+        hs = h.ToStr()
+        ms = mi.ToStr()
+        if mi < 10 then ms = "0" + ms
+        m.clock.text = hs + ":" + ms
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Rectangle width="1920" height="1080" color="0x000000FF" />
+        <Poster id="a" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0" />
+        <Poster id="b" width="1920" height="1080" loadDisplayMode="scaleToZoom" opacity="0" />
+        <Rectangle translation="[0,700]" width="1920" height="380" color="0x000000AA" />
+        <Label id="sub" translation="[100,860]" width="1200" font="font:SmallSystemFont" color="0xC8CAD0FF" />
+        <Label id="title" translation="[100,900]" width="1400" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="clock" translation="[1500,900]" width="320" horizAlign="right" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Poster uri="pkg:/images/wordmark.png" translation="[100,70]" width="296" height="57" opacity="0.85" />
+        <Label id="hint" text="OK  ver agora     ▶  seguinte     Voltar  sair" translation="[100,1000]" width="1720" font="font:SmallSystemFont" color="0xC8CAD0FF" visible="false" />
+        <Animation id="fadeIn" duration="2.5" easeFunction="inOutQuad">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="a.opacity" />
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="b.opacity" />
+        </Animation>
+        <Animation id="driftA" duration="14" easeFunction="linear">
+            <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[1.0,1.0],[1.12,1.12]]" fieldToInterp="a.scale" />
+        </Animation>
+        <Animation id="driftB" duration="14" easeFunction="linear">
+            <Vector2DFieldInterpolator key="[0.0, 1.0]" keyValue="[[1.12,1.12],[1.0,1.0]]" fieldToInterp="b.scale" />
+        </Animation>
+        <Timer id="timer" duration="12" repeat="true" />
+        <Timer id="clockTimer" duration="20" repeat="true" />
+    </children>
+</component>

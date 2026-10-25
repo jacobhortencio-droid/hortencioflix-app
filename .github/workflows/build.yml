@@ -1,0 +1,106 @@
+name: Compilar APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # versão = número da compilação + 100 (o repositório público recomeçou a contagem)
+      - name: Versão
+        id: ver
+        run: echo "ver=1.9.$(( ${{ github.run_number }} + 100 ))" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        id: java
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # A chave de assinatura não está no repositório (é público): vem do segredo KEYSTORE_B64
+      - name: Chave de assinatura
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Falta o segredo KEYSTORE_B64 (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > app/hortencioflix.jks
+
+      - name: Compilar
+        id: build
+        shell: bash
+        env:
+          HF_KS_PASS: ${{ secrets.KEYSTORE_PASS }}
+        run: |
+          set -o pipefail
+          {
+            echo "ANDROID_HOME=$ANDROID_HOME"
+            ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" || true
+            java -version
+            curl -sSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+            unzip -q /tmp/gradle.zip -d /tmp
+            echo "sdk.dir=$ANDROID_HOME" > local.properties
+            /tmp/gradle-8.7/bin/gradle testReleaseUnitTest assembleRelease --no-daemon --stacktrace
+          } 2>&1 | tee build-log.txt
+
+      - name: Empacotar app Roku
+        if: steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          # Pacote da app Roku (instalado na Roku pela app Android ou à mão)
+          mkdir -p /tmp/apk
+          (cd roku && zip -rq /tmp/apk/Hortencioflix-roku.zip manifest LEIA-ME.md source components images sounds -x "source/seed.json")
+          grep -E '^(major|minor|build)_version=' roku/manifest | cut -d= -f2 | paste -sd. - > /tmp/apk/roku-version.txt
+          cat /tmp/apk/roku-version.txt
+
+      - name: Publicar registo da compilação (ramo ci-status)
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/ci
+          tail -n 4000 build-log.txt > /tmp/ci/build-log.txt 2>/dev/null || echo "sem registo" > /tmp/ci/build-log.txt
+          grep -E "^e: |error:|FAILURE|What went wrong" -A 3 build-log.txt > /tmp/ci/errors.txt 2>/dev/null || true
+          echo "${{ steps.build.outcome }} java=${{ steps.java.outcome }} run=${{ github.run_number }} sha=${{ github.sha }}" > /tmp/ci/status.txt
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan ci-status-tmp
+          git rm -rf . -q || true
+          cp /tmp/ci/* .
+          git add build-log.txt errors.txt status.txt
+          git commit -q -m "CI ${{ github.run_number }}: ${{ steps.build.outcome }}"
+          git push -f origin HEAD:ci-status
+
+      - name: Publicar APK (ramo apk)
+        if: steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          mkdir -p /tmp/apk
+          cp app/build/outputs/apk/release/app-release.apk /tmp/apk/Hortencioflix-android.apk
+          git checkout -q --orphan apk-tmp
+          git rm -rf . -q || true
+          cp /tmp/apk/Hortencioflix-android.apk /tmp/apk/Hortencioflix-roku.zip /tmp/apk/roku-version.txt .
+          echo "${{ steps.ver.outputs.ver }}" > version.txt
+          git add Hortencioflix-android.apk version.txt Hortencioflix-roku.zip roku-version.txt
+          git commit -q -m "APK ${{ steps.ver.outputs.ver }}"
+          git push -f origin HEAD:apk
+
+      - name: Criar Release
+        if: steps.build.outcome == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.ver }}
+          name: Hortêncioflix Android ${{ steps.ver.outputs.ver }}
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            /tmp/apk/Hortencioflix-roku.zip

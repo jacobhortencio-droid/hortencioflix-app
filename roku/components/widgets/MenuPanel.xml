@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Painel lateral de opções (usado no leitor, IPTV, detalhes) -->
+<component name="MenuPanel" extends="Group">
+    <interface>
+        <field id="title" type="string" onChange="onTitle" />
+        <field id="items" type="array" onChange="onItems" />
+        <field id="startIndex" type="integer" value="0" />
+        <field id="menuId" type="string" />
+        <field id="selected" type="integer" alwaysNotify="true" />
+        <field id="cancelled" type="boolean" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.label = m.top.findNode("title")
+        m.list = m.top.findNode("list")
+        m.list.observeField("itemSelected", "onSelected")
+        m.top.observeField("focusedChild", "onFocusedChild")
+        m.top.visible = false
+        if m.global.hasField("accent") and m.global.accent <> invalid and m.global.accent <> "" then m.top.findNode("bar").color = m.global.accent
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("MenuPanel.init", e)
+        end try
+    end sub
+
+    sub onTitle_x()
+        m.label.text = m.top.title
+    end sub
+    sub onTitle()
+        try
+            onTitle_x()
+        catch e
+            reportCrash("MenuPanel.onTitle", e)
+        end try
+    end sub
+
+    sub onItems_x()
+        root = CreateObject("roSGNode", "ContentNode")
+        for each it in m.top.items
+            c = root.createChild("ContentNode")
+            c.title = it
+        end for
+        m.list.content = root
+        idx = m.top.startIndex
+        if idx > 0 and idx < m.top.items.Count() then m.list.jumpToItem = idx
+    end sub
+    sub onItems()
+        try
+            onItems_x()
+        catch e
+            reportCrash("MenuPanel.onItems", e)
+        end try
+    end sub
+
+    sub onFocusedChild_x()
+        if m.top.hasFocus() then m.list.setFocus(true)
+    end sub
+    sub onFocusedChild()
+        try
+            onFocusedChild_x()
+        catch e
+            reportCrash("MenuPanel.onFocusedChild", e)
+        end try
+    end sub
+
+    sub onSelected_x()
+        m.top.selected = m.list.itemSelected
+    end sub
+    sub onSelected()
+        try
+            onSelected_x()
+        catch e
+            reportCrash("MenuPanel.onSelected", e)
+        end try
+    end sub
+
+    function onKeyEvent_x(key as string, press as boolean) as boolean
+        if not press then return false
+        if key = "back" or key = "options" or key = "left"
+            m.top.cancelled = true
+            return true
+        end if
+        ' não deixar as teclas escaparem para o vídeo por baixo
+        return key = "right" or key = "play" or key = "fastforward" or key = "rewind"
+    end function
+    function onKeyEvent(key as string, press as boolean) as boolean
+        handled = false
+        try
+            handled = onKeyEvent_x(key, press)
+        catch e
+            reportCrash("MenuPanel.onKeyEvent", e)
+        end try
+        return handled
+    end function
+    ]]>
+    </script>
+    <children>
+        <Rectangle width="1920" height="1080" color="0x00000088" />
+        <Rectangle translation="[1180,0]" width="740" height="1080" color="0x16181EF4" />
+        <Rectangle id="bar" translation="[1180,0]" width="6" height="1080" color="0xE50914FF" />
+        <Label id="title" translation="[1230,70]" width="640" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" wrap="true" maxLines="2" />
+        <LabelList id="list" translation="[1220,170]" itemSize="[660,62]" numRows="13"
+            vertFocusAnimationStyle="floatingFocus" color="0xE6E7EAFF" focusedColor="0x0F1014FF"
+            font="font:SmallSystemFont" focusedFont="font:SmallBoldSystemFont" />
+    </children>
+</component>

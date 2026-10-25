@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="AddonTask" extends="Task">
+    <interface>
+        <field id="request" type="assocarray" />
+        <field id="result" type="assocarray" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Http.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/AddonTask.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Filters.brs" />
+</component>

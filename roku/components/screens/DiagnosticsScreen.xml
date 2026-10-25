@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Diagnóstico: informação do aparelho, rede, armazenamento e últimos erros -->
+<component name="DiagnosticsScreen" extends="Group">
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/components/utils/Ui.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.top.findNode("header").color = accentColor()
+        di = CreateObject("roDeviceInfo")
+        info = []
+        info.Push("App: Hortêncioflix v" + appVersion())
+        info.Push("Aparelho: " + di.GetModelDisplayName() + " (" + di.GetModel() + ")")
+        v = di.GetOSVersion()
+        if v <> invalid then info.Push("Roku OS: " + strOr(v.major) + "." + strOr(v.minor) + " build " + strOr(v.build))
+        ip = ""
+        addrs = di.GetIPAddrs()
+        for each k in addrs
+            if ip = "" then ip = addrs[k] + " (" + k + ")"
+        end for
+        info.Push("Rede: " + di.GetConnectionType() + "   ·   IP " + ip)
+        dm = di.GetDisplayMode()
+        info.Push("Ecrã: " + dm + "   ·   4K: " + boolText(di.CanDecodeVideo({ Codec: "hevc", Profile: "main10" }).result) + "   ·   Dolby Vision: " + boolText(di.CanDecodeVideo({ Codec: "dvhe" }).result) + "   ·   AV1: " + boolText(di.CanDecodeVideo({ Codec: "av1" }).result))
+        reg = registryUsage()
+        info.Push("Armazenamento de definições: " + Int(reg / 1024).ToStr() + "," + Int((reg mod 1024) / 103).ToStr() + " KB de 16 KB")
+        info.Push("Perfil: " + strOr(currentProfile().n) + "   ·   Add-ons: " + getAddons().Count().ToStr() + "   ·   Biblioteca Stremio: " + libAll().Count().ToStr() + " itens")
+        tb = "não"
+        if cfgRead("torboxKey", "") <> "" then tb = "sim"
+        tr = "não"
+        if cfgRead("traktToken", "") <> "" then tr = "sim"
+        info.Push("Conta Stremio: " + boolText(stremioLinked()) + "   ·   TorBox: " + tb + "   ·   Trakt: " + tr)
+        m.top.findNode("info").text = info.Join(Chr(10))
+        logs = []
+        if m.global.hasField("logs") and m.global.logs <> invalid then logs = m.global.logs
+        if logs.Count() = 0 then logs = ["(sem erros registados nesta sessão)"]
+        m.top.findNode("logs").content = labelContent(logs)
+        m.top.observeField("focusedChild", "onFocusedChild")
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("DiagnosticsScreen.init", e)
+        end try
+    end sub
+
+    function boolText(b as dynamic) as string
+        if b = true then return "sim"
+        return "não"
+    end function
+
+    sub onFocusedChild_x()
+        if m.top.hasFocus() then m.top.findNode("logs").setFocus(true)
+    end sub
+    sub onFocusedChild()
+        try
+            onFocusedChild_x()
+        catch e
+            reportCrash("DiagnosticsScreen.onFocusedChild", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Label id="header" text="Diagnóstico" translation="[80,48]" font="font:LargeBoldSystemFont" color="0xE50914FF" />
+        <Label id="info" translation="[80,140]" width="1760" wrap="true" font="font:SmallSystemFont" color="0xE6E7EAFF" />
+        <Label text="Últimos eventos e erros (envia uma foto deste ecrã se algo falhar):" translation="[80,520]" width="1760" font="font:SmallBoldSystemFont" color="0xFFFFFFFF" />
+        <LabelList id="logs" translation="[80,570]" itemSize="[1760,44]" numRows="10" vertFocusAnimationStyle="floatingFocus"
+            color="0xC8CAD0FF" focusedColor="0x0F1014FF" font="font:SmallestSystemFont" focusedFont="font:SmallestBoldSystemFont" />
+    </children>
+</component>

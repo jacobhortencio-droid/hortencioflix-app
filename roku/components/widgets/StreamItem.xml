@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Linha da lista de fontes: qualidade/add-on em cima, ficheiro em baixo -->
+<component name="StreamItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="width" type="float" />
+        <field id="height" type="float" />
+        <field id="focusPercent" type="float" onChange="onFocus" />
+        <field id="itemHasFocus" type="boolean" />
+        <field id="listHasFocus" type="boolean" onChange="onFocus" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/utils/Crash.brs" />
+    <script type="text/brightscript">
+    <![CDATA[
+    sub init_x()
+        m.l1 = m.top.findNode("l1")
+        m.l2 = m.top.findNode("l2")
+        m.badge = m.top.findNode("badge")
+        m.badgeText = m.top.findNode("badgeText")
+    end sub
+    sub init()
+        try
+            init_x()
+        catch e
+            reportCrash("StreamItem.init", e)
+        end try
+    end sub
+
+    sub onContent_x()
+        c = m.top.itemContent
+        if c = invalid then return
+        m.l1.text = c.title
+        m.l2.text = c.description
+        q = c.shortDescriptionLine1
+        m.badge.visible = (q <> "")
+        m.badgeText.text = q
+        if c.shortDescriptionLine2 = "risky"
+            m.badge.color = "0xC2410CFF"
+            m.badge.visible = true
+            m.badgeText.text = (q + " !").Trim()
+        else if c.shortDescriptionLine2 = "cached"
+            m.badge.color = "0x1F9D55FF"
+        else
+            m.badge.color = "0x4A4E5AFF"
+        end if
+        onFocus()
+    end sub
+    sub onContent()
+        try
+            onContent_x()
+        catch e
+            reportCrash("StreamItem.onContent", e)
+        end try
+    end sub
+
+    sub onFocus_x()
+        f = m.top.focusPercent > 0.5 and m.top.listHasFocus
+        if f
+            m.l1.color = "0x0F1014FF"
+            m.l2.color = "0x2A2D36FF"
+        else
+            m.l1.color = "0xFFFFFFFF"
+            m.l2.color = "0x9A9DA6FF"
+        end if
+    end sub
+    sub onFocus()
+        try
+            onFocus_x()
+        catch e
+            reportCrash("StreamItem.onFocus", e)
+        end try
+    end sub
+    ]]>
+    </script>
+    <children>
+        <Rectangle id="badge" translation="[16,16]" width="110" height="40" color="0x4A4E5AFF">
+            <Label id="badgeText" width="110" height="40" horizAlign="center" vertAlign="center" font="font:SmallestBoldSystemFont" color="0xFFFFFFFF" />
+        </Rectangle>
+        <Label id="l1" translation="[146,10]" width="1250" font="font:SmallBoldSystemFont" />
+        <Label id="l2" translation="[146,52]" width="1250" font="font:SmallestSystemFont" />
+    </children>
+</component>
