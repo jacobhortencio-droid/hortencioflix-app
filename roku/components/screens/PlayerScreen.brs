@@ -247,7 +247,11 @@ sub onMedia_x()
         return
     end if
     resume = findResume(strOr(m.md.videoId), strOr(m.md.metaId))
-    if resume > 30 and isMini()
+    if resume > 30 and boolOr(m.md.autoResume)
+        ' a app voltou ao que estavas a ver: continua no mesmo ponto sem perguntar
+        m.md.autoResume = false
+        prepare(resume)
+    else if resume > 30 and isMini()
         prepare(resume)
     else if resume > 30
         m.pendingResume = resume
@@ -477,6 +481,8 @@ end sub
 
 sub onState_x()
     st = m.video.state
+    ' app suspensa (botão Início): o sistema tira o descodificador — não é um erro da fonte
+    if boolOr(m.suspended) then return
     updateMiniLabel()
     if st = "playing" and not m.started and isPlaceholder()
         sourceNotReady()
@@ -514,6 +520,11 @@ sub onState_x()
         m.started = true
         m.autoTries = 0
         applySavedDelay()
+        if boolOr(m.pauseAfterResume)
+            ' estava em pausa quando saíste da app: volta em pausa, no mesmo ponto
+            m.pauseAfterResume = false
+            m.video.control = "pause"
+        end if
     else if st = "buffering"
         setStatus("A carregar…")
         if m.started and not isLive() then noteRebuffer()
@@ -1426,6 +1437,27 @@ sub onCommand_x()
         end if
     else if cmd = "close"
         m.top.finished = true
+    else if cmd = "save"
+        if m.started and not isLive() then saveLocal(false)
+    else if cmd = "suspend"
+        ' a app vai para segundo plano (Retoma Instantânea): guardar o ponto exato
+        m.suspendPos = Int(m.video.position)
+        if m.suspendPos < 1 then m.suspendPos = Int(numOr(m.lastPos, 0))
+        m.suspendWasPaused = m.video.state = "paused"
+        if m.started and not isLive() then saveLocal(false)
+        m.suspended = true
+        m.stallDog.control = "stop"
+        m.video.control = "stop"
+    else if cmd = "resume"
+        ' de volta: abre a mesma fonte no mesmo ponto (o link novo é pedido se o antigo expirou)
+        if not boolOr(m.suspended) then return
+        m.suspended = false
+        if not isLive() and Int(numOr(m.suspendPos, 0)) > 5
+            m.lastPos = m.suspendPos
+            m.started = true
+        end if
+        m.pauseAfterResume = boolOr(m.suspendWasPaused)
+        reloadSame("app retomada")
     end if
 end sub
 sub onCommand()

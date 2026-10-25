@@ -51,7 +51,12 @@ sub init_x()
         w.observeField("action", "onSettingsAction")
         w.observeField("done", "onWelcomeDone")
         pushScreen(w)
+    else
+        ' voltar exatamente onde estavas (ecrãs abertos e o vídeo no mesmo ponto)
+        m.restored = restoreNav()
     end if
+    m.navReady = true
+    if boolOr(m.restored) then saveNav()
     refreshTraktToken()
     if cfgRead("updateUrl", "") <> "" then checkUpdate(false)
     startSyncServer()
@@ -79,7 +84,7 @@ sub init_x()
     if cfgRead("torboxKey", "") <> "" then m.tbTask = startAddonTask({ kind: "tbme", key: cfgRead("torboxKey", "") }, "onTbMe")
 
     ' abertura animada (pode ser desligada nas Definições)
-    if cfgRead("introAnim", "1") = "1"
+    if cfgRead("introAnim", "1") = "1" and not boolOr(m.restored)
         m.intro = CreateObject("roSGNode", "IntroScreen")
         m.intro.observeField("done", "onIntroDone")
         m.top.appendChild(m.intro)
@@ -249,6 +254,7 @@ sub pushScreen(node as object)
     if m.player <> invalid and m.player.mode = "full" then m.player.mode = "mini"
     node.setFocus(true)
     if m.stack.Count() > 1 then animateIn(node, true)
+    saveNav()
 end sub
 
 sub popScreen()
@@ -269,6 +275,7 @@ sub popScreen()
         end if
     end if
     if prev.hasField("refresh") then prev.refresh = true
+    saveNav()
 end sub
 
 sub onItemSelected_x(event as object)
@@ -279,6 +286,7 @@ sub onItemSelected_x(event as object)
     details.observeField("pushJson", "onPushJson")
     details.observeField("itemSelected", "onItemSelected")
     details.observeField("personSelected", "onPersonSelected")
+    tagNav(details, { k: "details", item: navItem(item) })
     pushScreen(details)
     details.item = item
 end sub
@@ -291,25 +299,33 @@ sub onItemSelected(event as object)
 end sub
 
 sub onMenuSelected_x(event as object)
-    name = event.getData()
+    openMenuScreen(event.getData())
+end sub
+
+sub openMenuScreen(name as dynamic)
+    if name = invalid then return
     if name = "explore"
         s = CreateObject("roSGNode", "ExploreScreen")
         s.observeField("itemSelected", "onItemSelected")
+        tagNav(s, { k: "menu", n: "explore" })
         pushScreen(s)
     else if name = "search"
         s = CreateObject("roSGNode", "SearchScreen")
         s.observeField("itemSelected", "onItemSelected")
         s.observeField("closeRequest", "onCloseRequest")
+        tagNav(s, { k: "menu", n: "search" })
         pushScreen(s)
         s.start = true
     else if name = "iptv"
         s = CreateObject("roSGNode", "IptvScreen")
         s.observeField("playRequest", "onPlayRequest")
+        tagNav(s, { k: "menu", n: "iptv" })
         pushScreen(s)
         s.start = true
     else if name = "torbox"
         s = CreateObject("roSGNode", "TorboxScreen")
         s.observeField("playRequest", "onPlayRequest")
+        tagNav(s, { k: "menu", n: "torbox" })
         pushScreen(s)
         s.start = true
     else if name = "settings"
@@ -437,6 +453,7 @@ sub startMedia(req as dynamic)
     m.player.mode = "full"
     m.player.media = req
     showPlayerFull()
+    saveNav()
 end sub
 sub onPlayRequest(event as object)
     try
@@ -504,6 +521,7 @@ sub closePlayer()
     m.overlay.removeChild(p)
     m.screens.visible = true
     focusTopScreen()
+    saveNav()
 end sub
 
 function miniActive() as boolean
@@ -568,7 +586,11 @@ sub onExitDialog_x()
     dlg = m.top.dialog
     idx = dlg.buttonSelected
     dlg.close = true
-    if idx = 0 then m.top.exitApp = true
+    if idx = 0
+        ' saída pedida: da próxima vez começa no Início
+        clearNav()
+        m.top.exitApp = true
+    end if
 end sub
 sub onExitDialog()
     try
@@ -586,6 +608,7 @@ sub onPersonSelected_x(event as object)
     s = CreateObject("roSGNode", "SearchScreen")
     s.observeField("itemSelected", "onItemSelected")
     s.observeField("closeRequest", "onCloseRequest")
+    tagNav(s, { k: "person", n: name })
     pushScreen(s)
     s.query = name
     s.start = true
@@ -886,6 +909,7 @@ sub onLaunchArgs_x()
     details.observeField("pushJson", "onPushJson")
     details.observeField("itemSelected", "onItemSelected")
     details.observeField("personSelected", "onPersonSelected")
+    tagNav(details, { k: "details", item: navItem(item) })
     pushScreen(details)
     details.item = item
 end sub
@@ -908,6 +932,12 @@ end sub
 
 sub onRemTimer()
     try
+        ' de 30 em 30 s, com um vídeo aberto: guarda o ponto (se a TV desligar, a app volta aqui)
+        if m.player <> invalid
+            m.player.command = "save"
+            md = m.player.media
+            if md <> invalid and strOr(md.videoId) + strOr(md.url) <> strOr(m.navSig) then saveNav()
+        end if
         due = dueReminders()
         if due.Count() = 0 or m.top.dialog <> invalid then return
         r = due[0]
@@ -989,3 +1019,133 @@ sub onAmbChosen(event as object)
         reportCrash("MainScene.onAmbChosen", e)
     end try
 end sub
+
+' ---------- Voltar onde estavas ----------
+' Retoma Instantânea (Roku OS mantém a app em memória): customSuspend/customResume.
+' Se a Roku fechar a app (pouca memória, TV desligada), o estado guardado em cachefs reabre os mesmos
+' ecrãs e o vídeo no mesmo ponto (até 6 h depois).
+
+function navPath() as string
+    return "cachefs:/nav_state.json"
+end function
+
+sub tagNav(node as object, desc as object)
+    if not node.hasField("navState") then node.addField("navState", "assocarray", false)
+    node.navState = desc
+end sub
+
+function navItem(item as dynamic) as object
+    if item = invalid then return {}
+    return { id: strOr(item.id), type: strOr(item.type), name: strOr(item.name), poster: strOr(item.poster) }
+end function
+
+sub saveNav()
+    if boolOr(m.restoring) or not boolOr(m.navReady) then return
+    if cfgRead("restoreState", "1") <> "1" then return
+    st = { t: nowEpoch(), stack: [] }
+    for each n in m.stack
+        if n.hasField("navState")
+            d = n.navState
+            if d <> invalid and d.k <> invalid then st.stack.Push(d)
+        end if
+    end for
+    if m.player <> invalid
+        md = m.player.media
+        if md <> invalid and strOr(md.url) <> "" then st.player = md
+    end if
+    m.navSig = ""
+    if st.player <> invalid then m.navSig = strOr(st.player.videoId) + strOr(st.player.url)
+    if st.stack.Count() = 0 and st.player = invalid
+        clearNav()
+        return
+    end if
+    js = FormatJson(st)
+    if js = "" and st.player <> invalid
+        ' algum campo não se deixa guardar: fica o essencial do vídeo
+        md = st.player
+        st.player = { url: md.url, title: md.title, format: md.format, kind: md.kind, metaId: md.metaId, metaType: md.metaType, metaName: md.metaName, poster: md.poster, videoId: md.videoId, streamName: md.streamName, subsId: md.videoId }
+        js = FormatJson(st)
+    end if
+    if js <> "" then WriteAsciiFile(navPath(), js)
+end sub
+
+sub clearNav()
+    fs = CreateObject("roFileSystem")
+    if fs.Exists(navPath()) then fs.Delete(navPath())
+end sub
+
+function restoreNav() as boolean
+    if cfgRead("restoreState", "1") <> "1" then return false
+    raw = ReadAsciiFile(navPath())
+    if raw = "" then return false
+    clearNav()
+    st = ParseJson(raw)
+    if st = invalid or type(st) <> "roAssociativeArray" then return false
+    age = nowEpoch() - Int(numOr(st.t, 0))
+    if age < 0 or age > 6 * 3600 then return false
+    m.restoring = true
+    got = false
+    if st.stack <> invalid
+        for each d in st.stack
+            k = strOr(d.k)
+            if k = "details" and d.item <> invalid and strOr(d.item.id) <> ""
+                it = d.item
+                if strOr(it.type) = "" then it.type = "movie"
+                details = CreateObject("roSGNode", "DetailsScreen")
+                details.observeField("playRequest", "onPlayRequest")
+                details.observeField("pushJson", "onPushJson")
+                details.observeField("itemSelected", "onItemSelected")
+                details.observeField("personSelected", "onPersonSelected")
+                tagNav(details, { k: "details", item: it })
+                pushScreen(details)
+                details.item = it
+                got = true
+            else if k = "menu" and strOr(d.n) <> "" and strOr(d.n) <> "settings"
+                openMenuScreen(strOr(d.n))
+                got = true
+            else if k = "person" and strOr(d.n) <> ""
+                s = CreateObject("roSGNode", "SearchScreen")
+                s.observeField("itemSelected", "onItemSelected")
+                s.observeField("closeRequest", "onCloseRequest")
+                tagNav(s, { k: "person", n: strOr(d.n) })
+                pushScreen(s)
+                s.query = strOr(d.n)
+                s.start = true
+                got = true
+            end if
+        end for
+    end if
+    ' o vídeo só volta se a app não tiver fechado por causa dele (ver checkPlayGuard)
+    req = st.player
+    if req <> invalid and type(req) = "roAssociativeArray" and adultLocked() and isAdultText(strOr(req.title)) then req = invalid
+    if req <> invalid and type(req) = "roAssociativeArray" and strOr(req.url) <> "" and m.guardTimer = invalid
+        if strOr(req.kind) <> "live" then req.autoResume = true
+        logEvent("A voltar ao que estavas a ver: " + strOr(req.title))
+        startMedia(req)
+        got = true
+    end if
+    m.restoring = false
+    return got
+end function
+
+function customSuspend(arg as dynamic)
+    try
+        if m.player <> invalid then m.player.command = "suspend"
+        saveNav()
+    catch e
+        reportCrash("MainScene.customSuspend", e)
+    end try
+end function
+
+function customResume(arg as dynamic)
+    try
+        if m.player <> invalid then m.player.command = "resume"
+        if arg <> invalid and arg.launchParams <> invalid
+            lp = arg.launchParams
+            if lp.contentId <> invalid then m.top.launchArgs = { contentId: lp.contentId, mediaType: lp.mediaType }
+        end if
+        m.top.signalBeacon("AppResumeComplete")
+    catch e
+        reportCrash("MainScene.customResume", e)
+    end try
+end function

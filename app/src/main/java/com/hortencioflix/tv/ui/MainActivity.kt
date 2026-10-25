@@ -31,6 +31,7 @@ class MainActivity : BaseActivity() {
             if (savedInstanceState == null) showTab(tab) else selectNav(tab)
         }
         if (savedInstanceState == null) {
+            restoreSession()
             showSplash()
             WhatsNew.maybeShow(this)
             CrashReport.maybeShow(this)
@@ -47,6 +48,44 @@ class MainActivity : BaseActivity() {
             com.hortencioflix.tv.data.Prefs.put("askedNotif", "1")
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // O leitor ficou em pausa em segundo plano: voltar a ele exatamente onde estava
+        if (App.playerInBackground && App.playerTaskId != -1) {
+            try {
+                val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+                am.moveTaskToFront(App.playerTaskId, 0)
+            } catch (e: Exception) {
+                App.playerInBackground = false
+            }
+        }
+    }
+
+    /**
+     * O Android fechou a app enquanto estava a ver (pouca memória, muito tempo fora):
+     * ao abrir de novo, volta ao mesmo título; se foi há pouco, continua logo a ver no mesmo ponto.
+     */
+    private fun restoreSession() {
+        val raw = com.hortencioflix.tv.data.Prefs.str("playSession")
+        if (raw.isEmpty() || App.playerInBackground) return
+        com.hortencioflix.tv.data.Prefs.remove("playSession")
+        if (com.hortencioflix.tv.data.Prefs.str("restoreSession", "1") != "1") return
+        try {
+            val o = org.json.JSONObject(raw)
+            val age = System.currentTimeMillis() - o.optLong("at")
+            if (age < 0 || age > 6 * 3600_000L) return
+            val meta = com.hortencioflix.tv.data.MetaItem(
+                id = o.optString("id"), type = o.optString("type").ifEmpty { "movie" },
+                name = o.optString("name"), poster = o.optString("poster"), background = o.optString("bg")
+            )
+            if (meta.id.isEmpty()) return
+            val play = age < 30 * 60_000L
+            window.decorView.postDelayed({
+                if (!isFinishing) startActivity(Intent(this, DetailsActivity::class.java).putExtra("meta", meta).putExtra("play", play))
+            }, 1200)
+        } catch (e: Exception) {}
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

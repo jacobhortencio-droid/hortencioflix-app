@@ -154,6 +154,8 @@ sub render_x()
         m.actions.Push("uiStyle")
         items.Push("Animação de abertura: " + yesNo(cfgRead("introAnim", "1")))
         m.actions.Push("introAnim")
+        items.Push("Voltar onde estavas ao abrir: " + yesNo(cfgRead("restoreState", "1")))
+        m.actions.Push("restoreState")
         items.Push("Adicionar add-on (URL)")
         m.actions.Push("addAddon")
         items.Push("Gerir add-ons locais (" + getUserAddons().Count().ToStr() + ")")
@@ -284,6 +286,8 @@ sub onSelected_x()
         render()
     else if action = "introAnim"
         cycle("introAnim", ["1", "0"], "1")
+    else if action = "restoreState"
+        cycle("restoreState", ["1", "0"], "1")
         render()
     else if action = "rangePref"
         cycle("rangePref", ["auto", "dv", "hdr", "sdr", "off"], "auto")

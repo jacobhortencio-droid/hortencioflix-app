@@ -50,5 +50,8 @@ class App : Application() {
 
     companion object {
         @JvmStatic var mainTaskId: Int = -1
+        /** O leitor ficou em pausa em segundo plano (sem mini-leitor): ao abrir a app volta-se a ele. */
+        @JvmStatic var playerInBackground: Boolean = false
+        @JvmStatic var playerTaskId: Int = -1
     }
 }

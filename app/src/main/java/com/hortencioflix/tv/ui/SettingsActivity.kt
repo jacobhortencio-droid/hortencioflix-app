@@ -282,6 +282,8 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Rede lenta: baixar a qualidade", when (Prefs.str("qualAuto", "ask")) { "auto" -> "Mudar sozinha"; "off" -> "Nunca"; else -> "Perguntar (padrão)" } + " — depois de 3 pausas para carregar em 3 minutos", tag = "qualAuto"))
         rows.add(Row("Trailer no fundo da página do título", onOff(Prefs.str("trailerAuto", "1") == "1") + " — começa sem som ao fim de 2,5 s (não toca com poupança de dados)", tag = "trailerAuto"))
         rows.add(Row("«A seguir» no fim do filme", onOff(Prefs.str("postPlay", "1") == "1") + " — nos créditos, o vídeo encolhe e aparecem filmes para ver a seguir", tag = "postPlay"))
+        rows.add(Row("Mini-leitor automático", onOff(Prefs.str("pipAuto", "1") == "1") + " — ao sair da app com um vídeo a tocar, continua numa janela pequena", tag = "pipAuto"))
+        rows.add(Row("Voltar onde estavas", onOff(Prefs.str("restoreSession", "1") == "1") + " — se o Android fechar a app a meio de um vídeo, ao abrir volta ao mesmo ponto", tag = "restoreSession"))
         rows.add(Row("Perguntar ao retomar", onOff(Prefs.askResume) + " — «Continuar de 23:10 / Começar do início»", tag = "askResume"))
         rows.add(Row("Próximo episódio automático", onOff(Prefs.autoNext) + " — contagem de 10 s no fim do episódio", tag = "autoNext"))
         rows.add(Row("Enviar progresso para o Stremio", onOff(Prefs.syncProgress), tag = "progress"))
@@ -390,6 +392,8 @@ class SettingsActivity : BaseActivity() {
             }
             "trailerAuto" -> { Prefs.put("trailerAuto", if (Prefs.str("trailerAuto", "1") == "1") "0" else "1"); refresh() }
             "postPlay" -> { Prefs.put("postPlay", if (Prefs.str("postPlay", "1") == "1") "0" else "1"); refresh() }
+            "pipAuto" -> { Prefs.put("pipAuto", if (Prefs.str("pipAuto", "1") == "1") "0" else "1"); refresh() }
+            "restoreSession" -> { Prefs.put("restoreSession", if (Prefs.str("restoreSession", "1") == "1") "0" else "1"); refresh() }
             "rokuType" -> inputDialog("Escrever na TV", "Nome do filme…", "") { txt ->
                 if (txt.isNotEmpty()) lifecycleScope.launch {
                     val ok = com.hortencioflix.tv.data.RokuRemote.type(txt)

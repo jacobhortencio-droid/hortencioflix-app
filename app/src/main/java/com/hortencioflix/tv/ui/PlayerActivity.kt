@@ -56,6 +56,7 @@ import kotlin.math.roundToInt
 @OptIn(UnstableApi::class)
 class PlayerActivity : BaseActivity() {
     companion object {
+        const val PIP_ACTION = "com.hortencioflix.tv.PIP"
         fun start(ctx: Context) {
             if (!Debounce.ok("player")) return
             val i = Intent(ctx, PlayerActivity::class.java)
@@ -103,6 +104,10 @@ class PlayerActivity : BaseActivity() {
     private var subDelayMs = 0L
     private var netRetries = 0
     private var pausedAt = 0L
+    // Saída para segundo plano sem mini-leitor: o leitor fica em pausa e retoma no mesmo ponto ao voltar
+    private var bgAt = 0L
+    private var bgWasPlaying = false
+    private var pipReceiver: android.content.BroadcastReceiver? = null
     private var sameRetriedAt = 0L
     private var appliedDelayFor = ""
     private val failedSources = HashSet<Int>()
@@ -147,6 +152,7 @@ class PlayerActivity : BaseActivity() {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_player)
         playerView = findViewById(R.id.player_view)
+        registerPipReceiver()
         Prefs.str("resizeMode").toIntOrNull()?.let { playerView.resizeMode = it }
         osd = findViewById(R.id.osd)
         skipHint = findViewById(R.id.skip_hint)
@@ -281,6 +287,11 @@ class PlayerActivity : BaseActivity() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!Session.live && reachedReady) scrobble(if (isPlaying) "start" else "pause")
+                updatePip()
+            }
+
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                updatePip()
             }
 
             // Retomar depois de uma pausa longa: a ligação e o link do debrid já expiraram — abre de novo
@@ -1242,12 +1253,16 @@ class PlayerActivity : BaseActivity() {
         if (dur <= 0 || dur == C.TIME_UNSET) return
         val vid = Session.videoId
         if (pos > dur * 0.92) {
+            Prefs.remove("playSession")
             Prefs.removeProgress(meta.id)
             Prefs.setWatched(listOf(vid), true)
             com.hortencioflix.tv.data.WatchNext.remove(this, meta.id)
         }
         else if (pos > 15000) {
             Prefs.saveProgress(meta.id, vid, pos / 1000, dur / 1000, meta.name, meta.poster, meta.type)
+            // se o Android fechar a app em segundo plano, ao voltar abre este título no mesmo ponto
+            Prefs.put("playSession", org.json.JSONObject().put("id", meta.id).put("type", meta.type).put("name", meta.name)
+                .put("poster", meta.poster).put("bg", meta.background).put("at", System.currentTimeMillis()).toString())
             // cartão no ecrã inicial do Google TV (só ao sair ou a cada gravação com envio, para não escrever a toda a hora)
             if (push) com.hortencioflix.tv.data.WatchNext.update(this, meta, vid, pos, dur)
         }
@@ -1604,16 +1619,9 @@ class PlayerActivity : BaseActivity() {
             playerView.hideController()
             return
         }
-        if (pipSupported() && player?.isPlaying == true) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
-                    mainToFront()
-                    return
-                }
-            } catch (e: Exception) {
-                // sem suporte: fecha normalmente
-            }
+        if (pipSupported() && player?.isPlaying == true && enterPip()) {
+            mainToFront()
+            return
         }
         exit()
     }
@@ -1628,6 +1636,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun exit() {
+        Prefs.remove("playSession")
         if (!Session.live) scrobble("stop")
         saveProgress(true)
         if (!Session.live) com.hortencioflix.tv.data.RokuSync.syncQuietly()
@@ -1648,6 +1657,7 @@ class PlayerActivity : BaseActivity() {
             updateOverlay()
         } else if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
             // O mini-leitor foi fechado (X ou arrastado para fora): parar o som.
+            Prefs.remove("playSession")
             closePlayer()
         }
     }
@@ -1664,13 +1674,124 @@ class PlayerActivity : BaseActivity() {
         Prefs.remove("playGuard")
         saveProgress(true)
         val pip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode
-        if (!pip && !isChangingConfigurations) {
-            // Mini-leitor fechado ou app em segundo plano: parar.
+        if (pip || isChangingConfigurations || isFinishing) return
+        if (inPip) {
+            // O mini-leitor foi fechado: parar.
+            closePlayer()
+            return
+        }
+        // App em segundo plano (botão Início, chamada, outra app): fica em pausa no mesmo ponto.
+        // Ao voltar (pelo ícone da app ou pelas recentes) retoma exatamente onde estava.
+        bgWasPlaying = player?.playWhenReady == true
+        bgAt = android.os.SystemClock.elapsedRealtime()
+        player?.pause()
+        App.playerInBackground = true
+        App.playerTaskId = taskId
+        PlayLog.add("⏸ App em segundo plano — leitor em pausa em ${(player?.currentPosition ?: 0L) / 60000} min")
+        // ao fim de 30 min em segundo plano liberta o leitor (o progresso fica guardado)
+        handler.postDelayed(bgRelease, 30 * 60_000L)
+    }
+
+    private val bgRelease = Runnable {
+        if (bgAt > 0 && !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+            App.playerInBackground = false
             closePlayer()
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        App.playerInBackground = false
+        handler.removeCallbacks(bgRelease)
+        if (bgAt <= 0) return
+        val away = android.os.SystemClock.elapsedRealtime() - bgAt
+        bgAt = 0
+        val p = player ?: return
+        if (bgWasPlaying && away < 3 * 60_000L) {
+            // saída rápida: continua logo (a lógica da pausa longa reabre a fonte se o link tiver expirado)
+            p.play()
+        } else {
+            // muito tempo fora: fica em pausa no ponto exato, com os controlos à vista
+            playerView.showController()
+            if (isTv) playerView.findViewById<View>(androidx.media3.ui.R.id.exo_play_pause)?.requestFocus()
+        }
+    }
+
+    // ---------- Mini-leitor (imagem na imagem) ----------
+
+    private fun pipAuto() = Prefs.str("pipAuto", "1") == "1"
+
+    private fun pipParams(): PictureInPictureParams? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+        val b = PictureInPictureParams.Builder()
+        val vs = player?.videoSize
+        var ratio = Rational(16, 9)
+        if (vs != null && vs.width > 0 && vs.height > 0) {
+            val w = (vs.width * vs.pixelWidthHeightRatio).roundToInt().coerceAtLeast(1)
+            val r = w.toFloat() / vs.height
+            ratio = when { r > 2.39f -> Rational(239, 100); r < 0.42f -> Rational(42, 100); else -> Rational(w, vs.height) }
+        }
+        b.setAspectRatio(ratio)
+        val playing = player?.isPlaying == true
+        val actions = ArrayList<android.app.RemoteAction>()
+        fun act(icon: Int, title: String, code: Int) {
+            val pi = android.app.PendingIntent.getBroadcast(this, code,
+                Intent(PIP_ACTION).setPackage(packageName).putExtra("a", code),
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+            actions.add(android.app.RemoteAction(android.graphics.drawable.Icon.createWithResource(this, icon), title, title, pi))
+        }
+        if (!Session.live) act(android.R.drawable.ic_media_rew, "Recuar 10 s", 1)
+        if (playing) act(android.R.drawable.ic_media_pause, "Pausa", 2) else act(android.R.drawable.ic_media_play, "Continuar", 2)
+        if (Session.live) act(android.R.drawable.ic_media_next, "Canal seguinte", 4)
+        else act(android.R.drawable.ic_media_ff, "Avançar 30 s", 3)
+        b.setActions(actions)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+: ao ir para o ecrã inicial com o vídeo a tocar, passa sozinho a mini-leitor
+            b.setAutoEnterEnabled(pipAuto() && playing)
+            b.setSeamlessResizeEnabled(true)
+        }
+        return b.build()
+    }
+
+    private fun updatePip() {
+        if (!pipSupported() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try { pipParams()?.let { setPictureInPictureParams(it) } } catch (e: Exception) {}
+    }
+
+    private fun enterPip(): Boolean {
+        if (!pipSupported() || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        return try { enterPictureInPictureMode(pipParams()!!) } catch (e: Exception) { false }
+    }
+
+    // Botão Início com o vídeo a tocar: mini-leitor (no Android 12+ isto já é feito pelo sistema)
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
+        if (pipAuto() && player?.isPlaying == true && !locked) enterPip()
+    }
+
+    private fun registerPipReceiver() {
+        if (pipReceiver != null) return
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) {
+                val p = player ?: return
+                when (i?.getIntExtra("a", 0)) {
+                    1 -> p.seekTo((p.currentPosition - 10_000).coerceAtLeast(0))
+                    2 -> if (p.isPlaying) p.pause() else p.play()
+                    3 -> p.seekTo(p.currentPosition + 30_000)
+                    4 -> dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CHANNEL_UP))
+                }
+                updatePip()
+            }
+        }
+        pipReceiver = r
+        androidx.core.content.ContextCompat.registerReceiver(this, r, android.content.IntentFilter(PIP_ACTION), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
     override fun onDestroy() {
+        App.playerInBackground = false
+        pipReceiver?.let { try { unregisterReceiver(it) } catch (e: Exception) {} }
+        pipReceiver = null
         resetDisplayMode()
         handler.removeCallbacksAndMessages(null)
         player?.release()
