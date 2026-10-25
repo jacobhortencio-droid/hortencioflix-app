@@ -60,8 +60,8 @@ jobs:
             sleep 10
             u=$(cat /tmp/url.txt)
             echo "== em direto /health: $(curl -s --max-time 20 $u/health)" >> /tmp/diag.txt
-            c=$(python3 -c "import base64,json;print(base64.urlsafe_b64encode(json.dumps({'a':['https://v3-cinemeta.strem.io']}).encode()).decode().rstrip('='))")
-            echo "== em direto /stream: $(curl -s --max-time 30 $u/$c/stream/movie/tt0111161.json | head -c 300)" >> /tmp/diag.txt
+            c=$(python3 -c "import base64,json;print(base64.urlsafe_b64encode(json.dumps({'a':['https://v3-cinemeta.strem.io','https://torrentio.strem.fun']}).encode()).decode().rstrip('='))")
+            echo "== em direto /stream: $(curl -s --max-time 30 $u/$c/stream/movie/tt0111161.json | python3 -c 'import sys,json;print(json.load(sys.stdin).get("hf"))')" >> /tmp/diag.txt
           fi
           exit $rc
       - name: Guardar o endereço (ramo ci-curador)
