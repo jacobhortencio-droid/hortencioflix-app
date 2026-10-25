@@ -30,8 +30,16 @@ jobs:
             echo "::warning::Faltam os segredos CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID — testes feitos, nada publicado."
             exit 0
           fi
-          cd curador
           set +e
+          # diagnóstico (sem mostrar segredos): o token é válido? que contas vê? o Account ID bate?
+          {
+            echo "== token (utilizador):"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('success'),(d.get('result') or {}).get('status'),[e.get('message') for e in d.get('errors',[])])"
+            echo "== token (conta):"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('success'),(d.get('result') or {}).get('status'),[e.get('message') for e in d.get('errors',[])])"
+            echo "== contas que o token vê:"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts?per_page=20" | python3 -c "import sys,json,os;d=json.load(sys.stdin);a=os.environ['CLOUDFLARE_ACCOUNT_ID'].strip();print('n=',len(d.get('result') or []),'Account ID do segredo bate:',any(x['id']==a for x in d.get('result') or []),'tamanho do segredo:',len(a),[e.get('message') for e in d.get('errors',[])])"
+            echo "== subdomínio workers.dev:"; curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('success'),d.get('result'),[e.get('message') for e in d.get('errors',[])])"
+          } > /tmp/diag.txt 2>&1
+          cat /tmp/diag.txt
+          cd curador
           npx -y wrangler@4 deploy > /tmp/deploy.txt 2>&1
           rc=$?
           cat /tmp/deploy.txt
@@ -46,6 +54,6 @@ jobs:
           git checkout --orphan cur-tmp; git rm -rf . -q || true
           cp /tmp/url.txt curador-url.txt 2>/dev/null || touch curador-url.txt
           # registo da publicação (o wrangler não mostra o token)
-          sed -E 's/[A-Za-z0-9_-]{35,}/***/g' /tmp/deploy.txt | tail -n 80 > deploy-log.txt
+          { cat /tmp/diag.txt 2>/dev/null; sed -E 's/[A-Za-z0-9_-]{35,}/***/g' /tmp/deploy.txt | tail -n 80; } > deploy-log.txt
           git add curador-url.txt deploy-log.txt
           git commit -qm "Curador publicado"; git push -f origin HEAD:ci-curador
