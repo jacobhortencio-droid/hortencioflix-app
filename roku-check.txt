@@ -1,0 +1,182 @@
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+[[90m10:18:42:578 PM[39m] Using config file: "bsconfig.json"
+[[90m10:18:42:579 PM[39m] Loading 0 plugins for cwd "/home/runner/work/hortencioflix-app/hortencioflix-app/roku" []
+[[90m10:18:42:582 PM[39m] Parsing files
+[[90m10:18:42:875 PM[39m] Parsing files finished. ([34m292.816ms[39m)
+[[90m10:18:42:876 PM[39m] Validating project
+[[90m10:18:43:031 PM[39m] Validating project finished. ([34m155.140ms[39m)
+
+components/screens/PhoneConfigScreen.xml:5:54 - error BS1067: Cannot find function with name 'onClosing' in component scope
+
+ 5          <field id="closing" type="boolean" onChange="onClosing" />
+                                                         ~~~~~~~~~    
+
+
+components/screens/PosterItem.xml:5:55 - error BS1067: Cannot find function with name 'onContent' in component scope
+
+ 5          <field id="itemContent" type="node" onChange="onContent" />
+                                                          ~~~~~~~~~    
+
+
+components/screens/PosterItem.xml:6:50 - error BS1067: Cannot find function with name 'layout' in component scope
+
+ 6          <field id="width" type="float" onChange="layout" />
+                                                     ~~~~~~    
+
+
+components/screens/PosterItem.xml:7:51 - error BS1067: Cannot find function with name 'layout' in component scope
+
+ 7          <field id="height" type="float" onChange="layout" />
+                                                      ~~~~~~    
+
+
+components/screens/PosterItem.xml:8:57 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 8          <field id="focusPercent" type="float" onChange="onFocus" />
+                                                            ~~~~~~~    
+
+
+components/screens/PosterItem.xml:11:62 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 11          <field id="rowListHasFocus" type="boolean" onChange="onFocus" />
+                                                                  ~~~~~~~    
+
+
+components/screens/PosterItem.xml:12:59 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 12          <field id="gridHasFocus" type="boolean" onChange="onFocus" />
+                                                               ~~~~~~~    
+
+
+components/screens/TraktLinkScreen.xml:6:54 - error BS1067: Cannot find function with name 'onClosing' in component scope
+
+ 6          <field id="closing" type="boolean" onChange="onClosing" />
+                                                         ~~~~~~~~~    
+
+
+components/screens/WelcomeScreen.xml:10:74 - error BS1067: Cannot find function with name 'render' in component scope
+
+ 10          <field id="refresh" type="boolean" alwaysNotify="true" onChange="render" />
+                                                                              ~~~~~~    
+
+
+components/utils/AddonTask.brs:90:5 - error BS1105: Scope function will not be accessible because it has the same name as a built-in function
+
+ 90  sub run()
+         ~~~  
+
+
+components/utils/AddonTask.brs:90:5 - error BS1045: Cannot use reserved word 'run' as an identifier
+
+ 90  sub run()
+         ~~~  
+
+
+components/utils/ServerTask.brs:76:5 - error BS1105: Scope function will not be accessible because it has the same name as a built-in function
+
+ 76  sub run()
+         ~~~  
+
+
+components/utils/ServerTask.brs:76:5 - error BS1045: Cannot use reserved word 'run' as an identifier
+
+ 76  sub run()
+         ~~~  
+
+
+components/utils/StremioTask.brs:36:5 - error BS1105: Scope function will not be accessible because it has the same name as a built-in function
+
+ 36  sub run()
+         ~~~  
+
+
+components/utils/StremioTask.brs:36:5 - error BS1045: Cannot use reserved word 'run' as an identifier
+
+ 36  sub run()
+         ~~~  
+
+
+components/utils/TraktTask.brs:40:5 - error BS1105: Scope function will not be accessible because it has the same name as a built-in function
+
+ 40  sub run()
+         ~~~  
+
+
+components/utils/TraktTask.brs:40:5 - error BS1045: Cannot use reserved word 'run' as an identifier
+
+ 40  sub run()
+         ~~~  
+
+
+components/widgets/AmbientView.xml:13:72 - error BS1067: Cannot find function with name 'onInteractive' in component scope
+
+ 13          <field id="interactive" type="boolean" value="false" onChange="onInteractive" />
+                                                                            ~~~~~~~~~~~~~    
+
+
+components/widgets/ChannelItem.xml:5:55 - error BS1067: Cannot find function with name 'onContent' in component scope
+
+ 5          <field id="itemContent" type="node" onChange="onContent" />
+                                                          ~~~~~~~~~    
+
+
+components/widgets/ChannelItem.xml:8:57 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 8          <field id="focusPercent" type="float" onChange="onFocus" />
+                                                            ~~~~~~~    
+
+
+components/widgets/ChannelItem.xml:10:59 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 10          <field id="listHasFocus" type="boolean" onChange="onFocus" />
+                                                               ~~~~~~~    
+
+
+components/widgets/HfLoader.xml:5:53 - error BS1067: Cannot find function with name 'onControl' in component scope
+
+ 5          <field id="control" type="string" onChange="onControl" />
+                                                        ~~~~~~~~~    
+
+
+components/widgets/MenuPanel.xml:5:51 - error BS1067: Cannot find function with name 'onTitle' in component scope
+
+ 5          <field id="title" type="string" onChange="onTitle" />
+                                                      ~~~~~~~    
+
+
+components/widgets/MenuPanel.xml:6:50 - error BS1067: Cannot find function with name 'onItems' in component scope
+
+ 6          <field id="items" type="array" onChange="onItems" />
+                                                     ~~~~~~~    
+
+
+components/widgets/SkeletonRows.xml:5:61 - error BS1067: Cannot find function with name 'build' in component scope
+
+ 5          <field id="rows" type="integer" value="2" onChange="build" />
+                                                                ~~~~~    
+
+
+components/widgets/SkeletonRows.xml:8:66 - error BS1067: Cannot find function with name 'onActive' in component scope
+
+ 8          <field id="active" type="boolean" value="true" onChange="onActive" />
+                                                                     ~~~~~~~~    
+
+
+components/widgets/StreamItem.xml:5:55 - error BS1067: Cannot find function with name 'onContent' in component scope
+
+ 5          <field id="itemContent" type="node" onChange="onContent" />
+                                                          ~~~~~~~~~    
+
+
+components/widgets/StreamItem.xml:8:57 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 8          <field id="focusPercent" type="float" onChange="onFocus" />
+                                                            ~~~~~~~    
+
+
+components/widgets/StreamItem.xml:10:59 - error BS1067: Cannot find function with name 'onFocus' in component scope
+
+ 10          <field id="listHasFocus" type="boolean" onChange="onFocus" />
+                                                               ~~~~~~~    
+
+[[90m10:18:43:037 PM[39m] Found 29 errors
