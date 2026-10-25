@@ -31,14 +31,21 @@ jobs:
             exit 0
           fi
           cd curador
-          npx -y wrangler@3 deploy 2>&1 | tee /tmp/deploy.txt
-          grep -oE "https://[a-z0-9.-]+\.workers\.dev" /tmp/deploy.txt | head -1 > /tmp/url.txt || true
+          set +e
+          npx -y wrangler@3 deploy > /tmp/deploy.txt 2>&1
+          rc=$?
+          cat /tmp/deploy.txt
+          grep -oE "https://[a-z0-9.-]+\.workers\.dev" /tmp/deploy.txt | head -1 > /tmp/url.txt
           echo "Endereço: $(cat /tmp/url.txt)"
+          exit $rc
       - name: Guardar o endereço (ramo ci-curador)
         if: always()
         run: |
-          [ -s /tmp/url.txt ] || exit 0
+          [ -f /tmp/deploy.txt ] || exit 0
           git config user.name "ci"; git config user.email "ci@users.noreply.github.com"
           git checkout --orphan cur-tmp; git rm -rf . -q || true
-          cp /tmp/url.txt curador-url.txt; git add curador-url.txt
+          cp /tmp/url.txt curador-url.txt 2>/dev/null || touch curador-url.txt
+          # registo da publicação (o wrangler não mostra o token)
+          sed -E 's/[A-Za-z0-9_-]{35,}/***/g' /tmp/deploy.txt | tail -n 80 > deploy-log.txt
+          git add curador-url.txt deploy-log.txt
           git commit -qm "Curador publicado"; git push -f origin HEAD:ci-curador
