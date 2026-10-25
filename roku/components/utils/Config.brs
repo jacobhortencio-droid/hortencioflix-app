@@ -274,7 +274,7 @@ function altOf(x as object) as object
     if x.q <> invalid then q = Int(numOr(x.q, 0))
     rng = ""
     if x.range <> invalid then rng = x.range
-    return { url: x.url, name: x.name, title: x.title, filename: x.filename, headers: x.headers, q: q, cached: cached, range: rng }
+    return { url: x.url, name: x.name, title: x.title, filename: x.filename, headers: x.headers, q: q, cached: cached, range: rng, addon: x.addon }
 end function
 
 ' Índice da melhor fonte para uma resolução: exata → a mais próxima abaixo → a mais próxima acima

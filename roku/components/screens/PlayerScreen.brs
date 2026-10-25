@@ -201,6 +201,7 @@ sub onMedia_x()
     m.attempting = false
     if not m.fromRetry
         m.autoTries = 0
+        m.addonFails = {}
         m.qdropDeclined = false
         resetEpisodeState()
         ' «A seguir»: cada título novo volta a poder mostrar sugestões (e nunca as do filme anterior)
@@ -1255,16 +1256,36 @@ function nextAltIndex() as integer
     if alts = invalid or type(alts) <> "roArray" or nxt >= alts.Count() then return nxt
     cq = 0
     if alts[cur] <> invalid and alts[cur].q <> invalid then cq = Int(numOr(alts[cur].q, 0))
-    if cq > 0
+    ' um add-on que já falhou 2 vezes neste vídeo fica para o fim (não se percorrem as fontes dele uma a uma)
+    for rnd = 0 to 1
+        if cq > 0
+            for j = nxt to alts.Count() - 1
+                if altReady(alts[j]) and altOk(alts[j], rnd) and alts[j].q <> invalid and Int(numOr(alts[j].q, 0)) = cq then return j
+            end for
+        end if
         for j = nxt to alts.Count() - 1
-            if altReady(alts[j]) and alts[j].q <> invalid and Int(numOr(alts[j].q, 0)) = cq then return j
+            if altReady(alts[j]) and altOk(alts[j], rnd) then return j
         end for
-    end if
-    for j = nxt to alts.Count() - 1
-        if altReady(alts[j]) then return j
     end for
     return alts.Count()
 end function
+
+function altOk(a as object, rnd as integer) as boolean
+    if rnd > 0 or m.addonFails = invalid then return true
+    k = strOr(a.addon)
+    if k = "" then return true
+    return Int(numOr(m.addonFails[k], 0)) < 2
+end function
+
+sub noteAddonFail()
+    alts = m.md.alts
+    i = Int(numOr(m.md.altIndex, 0))
+    if alts = invalid or type(alts) <> "roArray" or i >= alts.Count() or alts[i] = invalid then return
+    k = strOr(alts[i].addon)
+    if k = "" then return
+    if m.addonFails = invalid then m.addonFails = {}
+    m.addonFails[k] = Int(numOr(m.addonFails[k], 0)) + 1
+end sub
 
 function altReady(a as object) as boolean
     if a = invalid then return false
@@ -1275,6 +1296,7 @@ end function
 sub tryNextSource()
     if not hasAltSource() then return
     if m.started then saveLocal(false)
+    noteAddonFail()
     i = nextAltIndex()
     s = m.md.alts[i]
     md = m.md
