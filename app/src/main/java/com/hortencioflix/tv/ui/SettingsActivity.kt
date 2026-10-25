@@ -332,6 +332,7 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Rede lenta: baixar a qualidade", when (Prefs.str("qualAuto", "ask")) { "auto" -> "Mudar sozinha"; "off" -> "Nunca"; else -> "Perguntar (padrão)" } + " — depois de 3 pausas para carregar em 3 minutos", tag = "qualAuto"))
         rows.add(Row("Trailer no fundo da página do título", onOff(Prefs.str("trailerAuto", "1") == "1") + " — começa sem som ao fim de 2,5 s (não toca com poupança de dados)", tag = "trailerAuto"))
         rows.add(Row("«A seguir» no fim do filme", onOff(Prefs.str("postPlay", "1") == "1") + " — nos créditos, o vídeo encolhe e aparecem filmes para ver a seguir", tag = "postPlay"))
+        rows.add(Row("Sinopses em português", onOff(Prefs.str("ptMeta", "1") == "1") + (if (Prefs.str("tmdbKey").isEmpty()) " — pelo Trakt; com uma chave TMDB (grátis em themoviedb.org) há muito mais títulos traduzidos" else " — TMDB e Trakt"), tag = "ptMeta"))
         rows.add(Row("Fontes curadas (servidor próprio)", (if (Prefs.str("curatorUrl").isEmpty()) "Desligado" else if (Prefs.str("curatorOn", "1") == "1") "Ligado" else "Pausado") + " — um só pedido junta as fontes de todos os add-ons, sem repetidos, e confirma no TorBox o que está pronto", tag = "curator"))
         rows.add(Row("Mini-leitor automático", onOff(Prefs.str("pipAuto", "1") == "1") + " — ao sair da app com um vídeo a tocar, continua numa janela pequena", tag = "pipAuto"))
         rows.add(Row("Voltar onde estavas", onOff(Prefs.str("restoreSession", "1") == "1") + " — se o Android fechar a app a meio de um vídeo, ao abrir volta ao mesmo ponto", tag = "restoreSession"))
@@ -444,6 +445,12 @@ class SettingsActivity : BaseActivity() {
             "trailerAuto" -> { Prefs.put("trailerAuto", if (Prefs.str("trailerAuto", "1") == "1") "0" else "1"); refresh() }
             "postPlay" -> { Prefs.put("postPlay", if (Prefs.str("postPlay", "1") == "1") "0" else "1"); refresh() }
             "curator" -> curatorMenu()
+            "ptMeta" -> choiceDialog("Sinopses em português", listOf(if (Prefs.str("ptMeta", "1") == "1") "Desligar" else "Ligar", "Chave TMDB…" + if (Prefs.str("tmdbKey").isNotEmpty()) " (definida)" else "")) { w ->
+                if (w == 0) { Prefs.put("ptMeta", if (Prefs.str("ptMeta", "1") == "1") "0" else "1"); refresh() }
+                else inputDialog("Chave TMDB (API key v3)", "32 letras e números", Prefs.str("tmdbKey")) { k ->
+                    Prefs.put("tmdbKey", k.trim()); refresh(); com.hortencioflix.tv.data.RokuSync.syncQuietly()
+                }
+            }
             "pipAuto" -> { Prefs.put("pipAuto", if (Prefs.str("pipAuto", "1") == "1") "0" else "1"); refresh() }
             "restoreSession" -> { Prefs.put("restoreSession", if (Prefs.str("restoreSession", "1") == "1") "0" else "1"); refresh() }
             "rokuType" -> inputDialog("Escrever na TV", "Nome do filme…", "") { txt ->

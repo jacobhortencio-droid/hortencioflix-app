@@ -72,6 +72,8 @@ sub onStart_x()
         return
     end if
     showHistory()
+    ' a app voltou a abrir: repete a pesquisa que estava no ecrã
+    if strOr(m.top.restoreQuery) <> "" then runSearch(m.top.restoreQuery, false)
 end sub
 sub onStart()
     try
@@ -141,6 +143,7 @@ end sub
 
 sub runSearch(text as string, save as boolean)
     m.lastQuery = text
+    m.top.lastQuery = text
     if save then addSearchHistory(text)
     m.header.text = "Pesquisar: " + text
     m.rows.visible = true

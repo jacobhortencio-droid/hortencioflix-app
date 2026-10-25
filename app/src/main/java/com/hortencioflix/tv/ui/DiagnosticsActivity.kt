@@ -47,6 +47,13 @@ class DiagnosticsActivity : ListScreen() {
             rows.add(header("Ligações"))
             val net = withContext(Dispatchers.IO) { Http.ping("${Addons.CINEMETA}/manifest.json") }
             rows.add(Row("Internet (Cinemeta)", mark(net.first, net.second)))
+            // velocidade real (teste de ~8 MB) e o que isso permite ver sem pausas
+            val kb = withContext(Dispatchers.IO) { com.hortencioflix.tv.data.NetSpeed.measure(force = true) }
+            if (kb > 0) {
+                val mb = kb / 1000.0
+                val ok = when { mb >= 60 -> "4K Remux"; mb >= 25 -> "4K WEB e 1080p Blu-ray"; mb >= 12 -> "1080p (cópias até ~8 GB num filme) e 4K leves"; mb >= 6 -> "1080p WEB (até ~4 GB num filme)"; else -> "720p" }
+                rows.add(Row("Velocidade", String.format("%.1f Mbps", mb) + " — sem pausas: $ok"))
+            } else rows.add(Row("Velocidade", "— não foi possível medir"))
             if (Prefs.torboxKey.isNotEmpty()) {
                 val acc = withContext(Dispatchers.IO) { com.hortencioflix.tv.data.TorboxApi.account(fresh = true) }
                 rows.add(Row("TorBox", com.hortencioflix.tv.data.TorboxApi.summary(acc)))

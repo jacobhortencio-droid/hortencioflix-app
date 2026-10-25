@@ -898,6 +898,7 @@ sub showStreamList(res as object)
             end if
         end for
         if rest <> "" then head = head + "     " + rest
+        if s.heavy = true then head = head + "     ! pesada para a tua Internet (~" + Int((numOr(s.kbps, 0) + 500) / 1000).ToStr() + " Mbps, tens " + netMbpsText() + "): vai parar"
         if file = "" then file = cleanText(s.filename)
         c.title = head
         c.description = file

@@ -492,7 +492,9 @@ object Addons {
         val ready = ready0.sortedWith(compareBy(
             { val sc = SourceStats.score(it); if (sc <= -3) 1 else 0 },
             // Preferência de áudio dobrado (PT-BR / PT-PT): essas fontes passam à frente
-            { if (dub.isNotEmpty() && AudioLang.matches(AudioLang.of(it), dub)) 0 else 1 }
+            { if (dub.isNotEmpty() && AudioLang.matches(AudioLang.of(it), dub)) 0 else 1 },
+            // Cópias mais pesadas do que a Internet aguenta (ex.: Remux 4K com 15 Mbps) vão para trás: são as que param
+            { if (NetSpeed.fits(it, type) == false) 1 else 0 }
         )).let { VideoRange.prefer(it, VideoRange.wanted(Prefs.str("rangePref", "auto"))) }
             // Filtros fixados pelo utilizador (ex.: «só Dolby Vision»): essas fontes vão para a frente
             .let { SourceFilters.pinnedFirst(it) }
@@ -617,6 +619,33 @@ object Addons {
             }
         }
         out
+    }
+
+    private val fileSubCache = ConcurrentHashMap<String, List<SubtitleItem>>()
+
+    /**
+     * Legendas que correspondem a um ficheiro concreto (pedido Stremio com «filename=…»): o OpenSubtitles
+     * põe primeiro as feitas para esse lançamento, que ficam sincronizadas. Vazio = nada melhor do que o normal.
+     */
+    fun subtitlesForFile(type: String, id: String, filename: String): List<SubtitleItem> {
+        val key = "$type|$id|$filename|${Prefs.subLang}"
+        fileSubCache[key]?.let { return it }
+        val bases = kotlinx.coroutines.runBlocking { supporting("subtitles", type, id) }.ifEmpty { listOf(OPENSUBS) }
+        val wanted = langCodes(Prefs.subLang)
+        val out = ArrayList<SubtitleItem>()
+        for (b in bases) {
+            val d = Http.getJson("$b/subtitles/$type/${pathId(id)}/filename=${enc(filename)}.json") ?: continue
+            val arr = d.optJSONArray("subtitles") ?: continue
+            for (i in 0 until arr.length()) {
+                val s = arr.optJSONObject(i) ?: continue
+                val u = s.optString("url"); val l = s.optString("lang")
+                if (u.isEmpty() || wanted.none { it.equals(l, true) }) continue
+                if (out.none { it.url == u } && out.size < 2) out.add(SubtitleItem(u, l, "${langName(l)} ✓ para este ficheiro"))
+            }
+            if (out.isNotEmpty()) break
+        }
+        fileSubCache[key] = out
+        return out
     }
 
     /** Todas as legendas disponíveis (para escolher manualmente no leitor). */

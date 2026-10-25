@@ -7,6 +7,12 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "🐢 Menos pausas: a app mede a velocidade da tua Internet e põe à frente as cópias que ela aguenta (um Remux 4K precisa de ~60 Mbps). As pesadas demais aparecem com aviso na lista de fontes",
+        "Se o vídeo parar várias vezes, a app oferece uma cópia mais leve da mesma qualidade (ex.: 1080p WEB em vez de 1080p Remux) antes de baixar a resolução",
+        "Mais reserva no leitor: guarda até 2,5 min à frente e, depois de parar, só retoma com 8 s carregados (acaba o pára-arranca)",
+        "Velocidade da Internet no Diagnóstico, com o que dá para ver sem pausas",
+        "Sinopses e títulos em português (Trakt; com uma chave TMDB grátis há ainda mais) — Definições › Sinopses em português",
+        "Legendas escolhidas pelo nome do ficheiro quando o add-on de legendas o permite (ficam sincronizadas)",
         "⚡ Fontes curadas (opcional): com o teu servidor gratuito, um só pedido junta as fontes de todos os add-ons, sem repetidos, e confirma no TorBox o que está pronto — Definições › Fontes curadas",
         "🖼 Mini-leitor: ao ir para o ecrã inicial com um vídeo a tocar, ele continua numa janela pequena, com botões para pausar, recuar 10 s e avançar 30 s (canal seguinte na TV ao vivo)",
         "Sair e voltar já não recomeça: se saíres da app a meio de um vídeo, ao voltar estás no mesmo ponto (em pausa se estiveste fora mais de 3 min)",

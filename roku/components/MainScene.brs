@@ -82,6 +82,8 @@ sub init_x()
     m.top.appendChild(m.remTimer)
     m.remTimer.control = "start"
     if cfgRead("torboxKey", "") <> "" then m.tbTask = startAddonTask({ kind: "tbme", key: cfgRead("torboxKey", "") }, "onTbMe")
+    ' velocidade real da Internet, no máximo de 6 em 6 h: as fontes pesadas demais passam para trás
+    if nowEpoch() - Int(Val(cfgRead("netKbpsAt", "0"))) > 6 * 3600 then m.spdTask = startAddonTask({ kind: "speedtest" }, "onSpeedTest")
 
     ' abertura animada (pode ser desligada nas Definições)
     if cfgRead("introAnim", "1") = "1" and not boolOr(m.restored)
@@ -1046,6 +1048,7 @@ sub saveNav()
     for each n in m.stack
         if n.hasField("navState")
             d = n.navState
+            if d <> invalid and d.k = "menu" and d.n = "search" and n.hasField("lastQuery") then d.q = n.lastQuery
             if d <> invalid and d.k <> invalid then st.stack.Push(d)
         end if
     end for
@@ -1100,6 +1103,15 @@ function restoreNav() as boolean
                 pushScreen(details)
                 details.item = it
                 got = true
+            else if k = "menu" and strOr(d.n) = "search" and strOr(d.q) <> ""
+                s = CreateObject("roSGNode", "SearchScreen")
+                s.observeField("itemSelected", "onItemSelected")
+                s.observeField("closeRequest", "onCloseRequest")
+                tagNav(s, { k: "menu", n: "search" })
+                pushScreen(s)
+                s.restoreQuery = strOr(d.q)
+                s.start = true
+                got = true
             else if k = "menu" and strOr(d.n) <> "" and strOr(d.n) <> "settings"
                 openMenuScreen(strOr(d.n))
                 got = true
@@ -1149,3 +1161,15 @@ function customResume(arg as dynamic)
         reportCrash("MainScene.customResume", e)
     end try
 end function
+
+sub onSpeedTest(event as object)
+    try
+        r = event.getData()
+        if r <> invalid and r.ok = true and r.kbps <> invalid
+            netRecord(Int(r.kbps), 0.5)
+            logEvent("Velocidade medida: " + netMbpsText())
+        end if
+    catch e
+        reportCrash("MainScene.onSpeedTest", e)
+    end try
+end sub

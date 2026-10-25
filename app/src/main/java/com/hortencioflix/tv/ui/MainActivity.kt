@@ -43,6 +43,8 @@ class MainActivity : BaseActivity() {
         com.hortencioflix.tv.TorboxWatchWorker.schedule(this)
         TorboxQueue.checkAccount(this)
         com.hortencioflix.tv.data.RokuSync.syncQuietly()
+        // velocidade real da Internet (no máximo de 6 em 6 h, só em Wi-Fi/sem limite de dados): escolhe fontes que não param
+        if (!com.hortencioflix.tv.data.Prefs.onMeteredNetwork()) Thread { com.hortencioflix.tv.data.NetSpeed.measure() }.start()
         if (!isTv && Build.VERSION.SDK_INT >= 33 && com.hortencioflix.tv.data.Prefs.str("askedNotif") != "1" &&
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             com.hortencioflix.tv.data.Prefs.put("askedNotif", "1")

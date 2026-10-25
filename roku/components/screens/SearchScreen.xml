@@ -3,6 +3,8 @@
     <interface>
         <field id="start" type="boolean" onChange="onStart" />
         <field id="query" type="string" />
+        <field id="restoreQuery" type="string" />
+        <field id="lastQuery" type="string" />
         <field id="itemSelected" type="assocarray" alwaysNotify="true" />
         <field id="closeRequest" type="boolean" alwaysNotify="true" />
     </interface>

@@ -292,6 +292,14 @@ class DetailsActivity : BaseActivity() {
                 if (genres.isNotEmpty()) parts.add(genres.take(3).joinToString(", "))
                 if (parts.isNotEmpty()) info.text = parts.joinToString("   ·   ")
                 f.optString("description").takeIf { it.isNotEmpty() }?.let { desc.text = it }
+                // sinopse (e título) em português, quando existir
+                if (Prefs.str("ptMeta", "1") == "1" && com.hortencioflix.tv.data.Translate.available()) {
+                    val pt = withContext(Dispatchers.IO) { com.hortencioflix.tv.data.Translate.pt(meta.type, meta.id) }
+                    if (pt != null && !isFinishing) {
+                        if (pt.desc.isNotEmpty()) desc.text = pt.desc
+                        if (pt.name.isNotEmpty()) titleView.text = pt.name
+                    }
+                }
                 showBackground(f.optString("background").ifEmpty { meta.background })
                 showLogo(f.optString("logo"))
                 showCast(f)
@@ -851,6 +859,7 @@ class DetailsActivity : BaseActivity() {
             flags.add(if (s.cached) "⚡" else "⬇ download")
             if (s.risky) flags.add("⚠ pode falhar")
             com.hortencioflix.tv.data.VideoRange.screenWarning(com.hortencioflix.tv.data.VideoRange.text(s))?.let { flags.add("⚠ $it") }
+            com.hortencioflix.tv.data.NetSpeed.warning(s, meta.type)?.let { flags.add("🐢 $it") }
             v.findViewById<TextView>(R.id.src_badges).text = (flags + inf.badges).joinToString("   ")
             v.findViewById<TextView>(R.id.src_addon).text = s.addon + "  ·  " + s.name.replace("\n", " ")
             v.setOnClickListener { onClick(i) }

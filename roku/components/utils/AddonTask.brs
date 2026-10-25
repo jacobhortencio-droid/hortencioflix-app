@@ -18,7 +18,9 @@ sub run_x()
     if req.manifests <> invalid then m.manifests = req.manifests
     kind = req.kind
     res = { ok: false }
-    if kind = "home"
+    if kind = "speedtest"
+        res = speedTest()
+    else if kind = "home"
         res = loadHome(req.addons)
     else if kind = "meta"
         res = loadMeta(req.addons, req.type, req.id)
@@ -525,7 +527,7 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
                     dub = audioDub(label + " " + detail + " " + filename)
                     full = label + " " + detail + " " + filename
                     rng = videoRange(full)
-                    item = { addon: addonName, name: label, title: detail, url: s.url, filename: filename, headers: headers, q: q, cached: not uncached, risky: risky, debrid: rxDeb.IsMatch(label), dub: dub, range: rng, src: srcKind(full), atmos: rxAtmos.IsMatch(full), lossless: rxLossless.IsMatch(full), surround: rxSurround.IsMatch(full), gb: fltSizeGb(full), lang: langMatch(full, langTokens) or dubMatches(dub, dubPref) }
+                    item = { heavy: false, addon: addonName, name: label, title: detail, url: s.url, filename: filename, headers: headers, q: q, cached: not uncached, risky: risky, debrid: rxDeb.IsMatch(label), dub: dub, range: rng, src: srcKind(full), atmos: rxAtmos.IsMatch(full), lossless: rxLossless.IsMatch(full), surround: rxSurround.IsMatch(full), gb: fltSizeGb(full), lang: langMatch(full, langTokens) or dubMatches(dub, dubPref) }
                     if maxQ > 0 and q > maxQ
                         filtered = filtered + 1
                     else if cachedOnly and uncached
@@ -548,6 +550,8 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
     end for
     ' dentro de cada grupo, as fontes no idioma preferido vêm primeiro
     good = preferRange(rankDebrid(good, hasDebrid), wantedRange(prefs))
+    ' cópias mais pesadas do que a Internet aguenta (ex.: Remux 4K com 15 Mbps) vão para trás: são as que param
+    good = fitOrder(good, Int(numOr0(prefs.netKbps)), mtype)
     ' filtros fixados pelo utilizador (ex.: «só Dolby Vision»): essas fontes vão para a frente
     good = fltPinnedFirst(good, prefs.pinFilters, prefs.caps)
     good.Append(rankDebrid(riskyList, hasDebrid))
@@ -1749,4 +1753,65 @@ end sub
 function isLocalAddon(b as string) as boolean
     rx = CreateObject("roRegex", "^https?://(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|[^/]*\.local[:/])", "i")
     return rx.IsMatch(b)
+end function
+
+' ---------- Peso das fontes vs velocidade da Internet ----------
+
+' Bitrate médio (kbit/s) pelo tamanho do ficheiro e duração provável (filme 120 min, episódio 45 min)
+function srcKbps(gb as float, mtype as string) as integer
+    if gb <= 0.05 then return 0
+    mins = 120
+    if mtype = "series" or mtype = "anime"
+        if gb > 25 then return 0
+        mins = 45
+    end if
+    return Int(gb * 8000000 / (mins * 60))
+end function
+
+' Mantém a ordem (incluindo o idioma preferido primeiro) mas, dentro de cada idioma, as que cabem na ligação vêm antes
+function fitOrder(list as object, net as integer, mtype as string) as object
+    if net <= 0 or list.Count() < 2 then return list
+    a = []
+    b = []
+    c = []
+    d = []
+    for each x in list
+        k = srcKbps(numOr0(x.gb), mtype)
+        heavy = k > 0 and k > net * 0.75
+        x.heavy = heavy
+        x.kbps = k
+        if x.lang = true
+            if heavy then b.Push(x) else a.Push(x)
+        else
+            if heavy then d.Push(x) else c.Push(x)
+        end if
+    end for
+    a.Append(b)
+    a.Append(c)
+    a.Append(d)
+    return a
+end function
+
+' Teste de velocidade: ~8 MB do Cloudflare, cronometrado
+function speedTest() as object
+    x = CreateObject("roUrlTransfer")
+    x.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    x.InitClientCertificates()
+    x.SetUrl("https://speed.cloudflare.com/__down?bytes=8000000")
+    port = CreateObject("roMessagePort")
+    x.SetMessagePort(port)
+    t = CreateObject("roTimespan")
+    if not x.AsyncGetToFile("tmp:/hf_speed.bin") then return { ok: false }
+    msg = wait(20000, port)
+    ms = t.TotalMilliseconds()
+    fs = CreateObject("roFileSystem")
+    size = 0
+    st = fs.Stat("tmp:/hf_speed.bin")
+    if st <> invalid and st.size <> invalid then size = st.size
+    fs.Delete("tmp:/hf_speed.bin")
+    if type(msg) <> "roUrlEvent" or msg.GetResponseCode() <> 200 or size < 1000000 or ms < 200 then return { ok: false }
+    ' desconta ~300 ms de arranque da ligação
+    eff = ms - 300
+    if eff < 200 then eff = ms
+    return { ok: true, kbps: Int(size * 8 / eff) }
 end function

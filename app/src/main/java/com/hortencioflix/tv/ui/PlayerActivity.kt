@@ -171,7 +171,11 @@ class PlayerActivity : BaseActivity() {
             .setEnableDecoderFallback(true)
         // Arranca com 1,5 s em memória, mantém até 60 s à frente e 20 s para trás (recuar sem recarregar).
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(20_000, 60_000, 1_500, 3_000)
+            // Mais reserva: guarda até 2,5 min à frente e, depois de uma pausa, só retoma com 8 s
+            // carregados (evita o «pára-arranca» de segundo a segundo numa ligação no limite).
+            .setBufferDurationsMs(30_000, 150_000, 2_500, 8_000)
+            .setTargetBufferBytes(96 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
             .setBackBuffer(20_000, true)
             .build()
         val p = ExoPlayer.Builder(this, renderers)
@@ -374,12 +378,32 @@ class PlayerActivity : BaseActivity() {
             dialog().setTitle(Session.meta?.name ?: "Continuar a ver?")
                 .setItems(arrayOf("▶  Continuar de ${formatTime(start)}", "↺  Começar do início")) { _, w ->
                     chosen = true
-                    playStream(Session.streamIndex, if (w == 0) start * 1000 else 0L)
+                    startWithMatchedSubs(Session.streamIndex, if (w == 0) start * 1000 else 0L)
                 }
-                .setOnDismissListener { if (!chosen) playStream(Session.streamIndex, start * 1000) }
+                .setOnDismissListener { if (!chosen) startWithMatchedSubs(Session.streamIndex, start * 1000) }
                 .show()
         } else {
-            playStream(Session.streamIndex, start * 1000)
+            startWithMatchedSubs(Session.streamIndex, start * 1000)
+        }
+    }
+
+    /**
+     * Legendas sincronizadas com ESTE ficheiro: pede aos add-ons de legendas (ex.: OpenSubtitles) as que
+     * correspondem ao nome do ficheiro da fonte e põe-nas primeiro. Espera no máximo 1,5 s (o resto fica em cache).
+     */
+    private fun startWithMatchedSubs(idx: Int, ms: Long) {
+        val s = Session.streams.getOrNull(idx)
+        val meta = Session.meta
+        if (s == null || meta == null || Prefs.subLang == "off" || s.filename.length < 8) { playStream(idx, ms); return }
+        lifecycleScope.launch {
+            val vid = Session.videoId
+            val m = withTimeoutOrNull(1500) { withContext(Dispatchers.IO) { Addons.subtitlesForFile(meta.type, vid, s.filename) } }
+            if (!m.isNullOrEmpty() && Session.videoId == vid) {
+                Session.subtitles = (m + Session.subtitles).distinctBy { it.url }.take(10)
+                origSubs = Session.subtitles
+                PlayLog.add("💬 Legenda escolhida pelo nome do ficheiro (${m.first().label})")
+            }
+            if (!isFinishing && !isDestroyed) playStream(idx, ms)
         }
     }
 
@@ -1400,7 +1424,33 @@ class PlayerActivity : BaseActivity() {
         rebuffers.add(now)
         rebuffers.removeAll { now - it > 180_000 }
         if (rebuffers.size < 3 || Session.directStream != null) return
-        val cur = Session.streams.getOrNull(streamIndex)?.quality ?: return
+        val curSrc = Session.streams.getOrNull(streamIndex)
+        val type = Session.meta?.type ?: "movie"
+        // a ligação não aguenta esta fonte: fica a saber-se (as próximas escolhas já contam com isso)
+        val need = curSrc?.let { com.hortencioflix.tv.data.NetSpeed.sourceKbps(it, type) } ?: 0
+        val bw = (androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(this).bitrateEstimate / 1000).toInt()
+        if (bw > 0) com.hortencioflix.tv.data.NetSpeed.record(bw, 0.5)
+        else if (need > 0) com.hortencioflix.tv.data.NetSpeed.record((need * 0.9).toInt(), 0.5)
+        // primeiro: a mesma qualidade, mas uma cópia mais leve que cabe na ligação (ex.: WEB 1080p em vez de Remux 1080p)
+        if (curSrc != null && need > 0 && !qualDropDeclined && Prefs.str("qualAuto", "ask") != "off") {
+            val light = Session.streams.indices.filter { it != streamIndex && it !in failedSources && Session.streams[it].cached &&
+                Session.streams[it].quality == curSrc.quality && com.hortencioflix.tv.data.NetSpeed.fits(Session.streams[it], type) == true }
+                .firstOrNull()   // a primeira que cabe (já vem ordenada pela preferência)
+            if (light != null) {
+                rebuffers.clear()
+                val lk = (com.hortencioflix.tv.data.NetSpeed.sourceKbps(Session.streams[light], type) + 500) / 1000
+                val go = {
+                    PlayLog.add("📉 Muitas pausas — a mudar para uma cópia ${qualityLabel(curSrc.quality)} mais leve (~$lk Mbps)")
+                    playStream(light, player?.currentPosition ?: 0L)
+                }
+                if (Prefs.str("qualAuto", "ask") == "auto") { toast("A Internet não chega para esta cópia — a mudar para uma mais leve"); go() }
+                else glassChoice("A Internet não chega para esta cópia (~${(need + 500) / 1000} Mbps)", listOf("Mudar para ${qualityLabel(curSrc.quality)} mais leve (~$lk Mbps) — sem pausas", "Manter esta cópia")) { i ->
+                    if (i == 0) go() else qualDropDeclined = true
+                }
+                return
+            }
+        }
+        val cur = curSrc?.quality ?: return
         val lower = when { cur >= 2160 -> 1080; cur >= 1080 -> 720; cur >= 720 -> 480; else -> return }
         if (Session.streams.none { it.cached && it.quality in 1..lower }) return
         rebuffers.clear()
@@ -1635,7 +1685,15 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
+    /** Guarda a velocidade que o leitor mediu neste vídeo (só se tocou o suficiente para contar). */
+    private fun recordBandwidth() {
+        if (!reachedReady || Session.live) return
+        val bw = (androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(this).bitrateEstimate / 1000).toInt()
+        if (bw > 0) com.hortencioflix.tv.data.NetSpeed.record(bw, 0.3)
+    }
+
     private fun exit() {
+        recordBandwidth()
         Prefs.remove("playSession")
         if (!Session.live) scrobble("stop")
         saveProgress(true)
@@ -1680,6 +1738,7 @@ class PlayerActivity : BaseActivity() {
             closePlayer()
             return
         }
+        recordBandwidth()
         // App em segundo plano (botão Início, chamada, outra app): fica em pausa no mesmo ponto.
         // Ao voltar (pelo ícone da app ou pelas recentes) retoma exatamente onde estava.
         bgWasPlaying = player?.playWhenReady == true

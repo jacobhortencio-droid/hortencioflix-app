@@ -302,6 +302,8 @@ function handleSync(method as string, path as string, query as string, buf as st
                 cfgWrite("curatorUrl", cu)
             end if
         end if
+        tk = d.prefs.tmdbKey
+        if tk <> invalid and (type(tk) = "roString" or type(tk) = "String") and tk <> "" and Len(tk) <= 64 then cfgWrite("tmdbKey", tk)
         co = d.prefs.curatorOn
         if co <> invalid and (co = "0" or co = "1") then cfgWrite("curatorOn", co)
     end if

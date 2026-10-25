@@ -274,7 +274,9 @@ function altOf(x as object) as object
     if x.q <> invalid then q = Int(numOr(x.q, 0))
     rng = ""
     if x.range <> invalid then rng = x.range
-    return { url: x.url, name: x.name, title: x.title, filename: x.filename, headers: x.headers, q: q, cached: cached, range: rng, addon: x.addon }
+    gb = 0.0
+    if x.gb <> invalid then gb = numOr(x.gb, 0)
+    return { url: x.url, name: x.name, title: x.title, filename: x.filename, headers: x.headers, q: q, cached: cached, range: rng, addon: x.addon, gb: gb }
 end function
 
 ' Índice da melhor fonte para uma resolução: exata → a mais próxima abaixo → a mais próxima acima
@@ -332,6 +334,7 @@ function startAddonTask(req as object, callback as string) as object
     req.rangePref = cfgRead("rangePref", "auto")
     req.pinFilters = pinnedFilters()
     req.srcStats = cfgRead("srcStats", "{}")
+    req.netKbps = Int(Val(cfgRead("netKbps", "0")))
     ' fontes curadas (servidor próprio): só para pedidos de fontes
     if req.kind = "streams" and cfgRead("curatorOn", "1") = "1"
         req.curator = cfgRead("curatorUrl", "")
@@ -1558,4 +1561,32 @@ function isAnimatedMeta(meta as dynamic) as boolean
         if lg = "animation" or lg = "anime" or lg = "animação" or lg = "animacao" then return true
     end for
     return false
+end function
+
+' ---------- Velocidade da Internet (para escolher fontes que não param) ----------
+
+sub netRecord(kbps as integer, weight as float)
+    if kbps < 200 or kbps > 2000000 then return
+    old = Int(Val(cfgRead("netKbps", "0")))
+    v = kbps
+    if old > 0 then v = Int(old * (1 - weight) + kbps * weight)
+    cfgWrite("netKbps", v.ToStr())
+    cfgWrite("netKbpsAt", nowEpoch().ToStr())
+end sub
+
+function netMbpsText() as string
+    k = Int(Val(cfgRead("netKbps", "0")))
+    if k <= 0 then return "?"
+    return Int(k / 1000).ToStr() + "." + Int((k Mod 1000) / 100).ToStr() + " Mbps"
+end function
+
+' Bitrate médio (kbit/s) de uma cópia pelo tamanho (filme 120 min, episódio 45 min); 0 = não se sabe
+function kbpsOf(gb as float, mtype as string) as integer
+    if gb <= 0.05 then return 0
+    mins = 120
+    if mtype = "series" or mtype = "anime"
+        if gb > 25 then return 0
+        mins = 45
+    end if
+    return Int(gb * 8000000 / (mins * 60))
 end function

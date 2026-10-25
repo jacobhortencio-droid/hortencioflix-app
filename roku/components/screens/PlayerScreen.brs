@@ -202,6 +202,7 @@ sub onMedia_x()
     if not m.fromRetry
         m.autoTries = 0
         m.addonFails = {}
+        m.lightTried = false
         m.qdropDeclined = false
         resetEpisodeState()
         ' «A seguir»: cada título novo volta a poder mostrar sugestões (e nunca as do filme anterior)
@@ -676,6 +677,31 @@ sub onPosition_x()
     checkSegments(curPos)
     checkNextCard(curPos)
     checkPostPlay(curPos)
+    checkPrefetchNext(curPos)
+end sub
+
+' Faltando ~6 min (ou 80 %), procura já as fontes do episódio seguinte: o «Próximo» arranca sem espera
+sub checkPrefetchNext(curPos as float)
+    if strOr(m.md.metaType) <> "series" or not hasNextEpisode() then return
+    dur = m.video.duration
+    if dur < 600 then return
+    if curPos < dur - 360 and curPos < dur * 0.8 then return
+    i = Int(numOr(m.md.epIndex, -1)) + 1
+    ep = m.md.episodes[i]
+    if ep = invalid or strOr(m.preFor) = strOr(ep.id) then return
+    m.preFor = strOr(ep.id)
+    m.preRes = invalid
+    m.preTask = startAddonTask({ kind: "streams", type: m.md.metaType, id: ep.id, animated: boolOr(m.md.animated) }, "onPreStreams")
+end sub
+
+sub onPreStreams(event as object)
+    try
+        if m.preTask = invalid or not event.getRoSGNode().isSameNode(m.preTask) then return
+        r = event.getData()
+        if r <> invalid and r.streams <> invalid and r.streams.Count() > 0 then m.preRes = { id: m.preFor, res: r, at: CreateObject("roDateTime").AsSeconds() }
+    catch e
+        reportCrash("PlayerScreen.onPreStreams", e)
+    end try
 end sub
 
 ' ---------- «A seguir» no fim do filme ----------
@@ -1045,6 +1071,7 @@ end sub
 sub onClosing_x()
     if m.top.closing
         clearGuard()
+        recordBandwidth()
         if m.started and not isLive()
             saveLocal(false)
             pushStremio(false)
@@ -1507,14 +1534,25 @@ sub playNext()
     m.nextEp = m.md.episodes[i]
     m.video.control = "stop"
     m.started = false
-    setStatus("A procurar fontes para " + m.nextEp.label + "…")
     showOsd(strOr(m.md.metaName) + " — " + m.nextEp.label)
+    ' fontes já procuradas durante o episódio (há menos de 30 min)? arranca já
+    if m.preRes <> invalid and m.preRes.id = strOr(m.nextEp.id) and CreateObject("roDateTime").AsSeconds() - m.preRes.at < 1800
+        pr = m.preRes.res
+        m.preRes = invalid
+        logEvent("Próximo episódio com fontes já preparadas")
+        handleNextStreams(pr)
+        return
+    end if
+    setStatus("A procurar fontes para " + m.nextEp.label + "…")
     m.nextTask = startAddonTask({ kind: "streams", type: m.md.metaType, id: m.nextEp.id, animated: boolOr(m.md.animated) }, "onNextStreams")
 end sub
 
 sub onNextStreams_x(event as object)
     if m.nextTask = invalid or not event.getRoSGNode().isSameNode(m.nextTask) then return
-    res = event.getData()
+    handleNextStreams(event.getData())
+end sub
+
+sub handleNextStreams(res as object)
     streams = res.streams
     if streams = invalid or streams.Count() = 0
         setStatus("Não há fontes para " + m.nextEp.label + ".")
@@ -2238,7 +2276,34 @@ sub noteRebuffer()
     keep.Push(now)
     m.rebuf = keep
     if keep.Count() < 3 or not canSwitchQuality() then return
+    ' a ligação não aguenta esta cópia: fica a saber-se (as próximas escolhas já contam com isso)
+    si = m.video.streamInfo
+    need = 0
+    alts0 = m.md.alts
+    ai = Int(numOr(m.md.altIndex, 0))
+    if alts0 <> invalid and type(alts0) = "roArray" and ai < alts0.Count() and alts0[ai] <> invalid then need = kbpsOf(numOr(alts0[ai].gb, 0), strOr(m.md.metaType))
+    if si <> invalid and si.measuredBitrate <> invalid and numOr(si.measuredBitrate, 0) > 0
+        netRecord(Int(numOr(si.measuredBitrate, 0) / 1000), 0.5)
+    else if need > 0
+        netRecord(Int(need * 0.9), 0.5)
+    end if
     cur = currentQuality()
+    net = Int(Val(cfgRead("netKbps", "0")))
+    ' cópia pesada (ex.: Remux) para a Internet que há: primeiro tenta uma cópia mais leve da mesma qualidade
+    if need > 0 and net > 0 and need > net * 0.75 and not boolOr(m.lightTried) and cfgRead("qualAuto", "ask") <> "off" and m.qdropDeclined <> true
+        m.lightTried = true
+        m.rebuf = []
+        if cfgRead("qualAuto", "ask") = "auto"
+            logEvent("Muitas pausas — a procurar uma cópia " + qualityText(cur) + " mais leve")
+            showOsd("A Internet não chega para esta cópia — a mudar para uma mais leve")
+            startQualitySwitch(cur)
+            return
+        end if
+        if m.menu.visible then return
+        m.qdropTarget = cur
+        openMenu(m.menu, "qdrop", "A Internet não chega para esta cópia (~" + Int((need + 500) / 1000).ToStr() + " Mbps)", ["Mudar para " + qualityText(cur) + " mais leve — sem pausas", "Manter esta cópia"], 0)
+        return
+    end if
     lower = 0
     if cur >= 2160 then lower = 1080
     if cur >= 1080 and cur < 2160 then lower = 720
@@ -2390,4 +2455,15 @@ sub onNetTimer()
     catch e
         reportCrash("PlayerScreen.onNetTimer", e)
     end try
+end sub
+
+' Velocidade medida pelo leitor neste vídeo (conta para as próximas escolhas de fonte)
+sub recordBandwidth()
+    if isLive() or not m.started then return
+    si = m.video.streamInfo
+    if si = invalid then return
+    b = si.measuredBitrate
+    if b = invalid then return
+    k = Int(numOr(b, 0) / 1000)
+    if k > 0 then netRecord(k, 0.3)
 end sub
