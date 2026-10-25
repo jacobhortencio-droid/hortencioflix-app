@@ -84,4 +84,15 @@ r = await worker.fetch(new Request(`https://cur.test/xyz/stream/movie/tt1.json`)
 assert.equal(r.status, 400);
 
 clearInterval(keep);
+// «⚡ pronto» segundo o add-on, mas o TorBox não tem: passa a por descarregar
+{
+  const items = [normalize({ name: "[TB⚡] Comet 4K", url: `https://comet.test/play/${"d".repeat(40)}/0` }, "Comet", 0),
+                 normalize({ name: "[TB⚡] Comet 1080p", url: `https://comet.test/play/${"e".repeat(40)}/0` }, "Comet", 1)];
+  const ready = new Set(["e".repeat(40)]); ready.checked = new Set(["d".repeat(40), "e".repeat(40)]);
+  const out = curate(items, ready, { k: "K" }, "cfg", "https://cur.test");
+  assert.equal(out[0].hf.hash, "e".repeat(40));
+  assert.ok(out[1].name.startsWith("[TB download]") && !out[1].hf.cached);
+  const r2 = new Set(); r2.checked = new Set();   // sem confirmação do TorBox: não mexe
+  assert.ok(curate([normalize({ name: "[TB⚡] X", url: `https://c/${"f".repeat(40)}` }, "C", 0)], r2, { k: "K" }, "c", "o")[0].hf.cached);
+}
 console.log("curador: todos os testes passaram");

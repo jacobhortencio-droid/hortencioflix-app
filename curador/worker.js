@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.2.1";
+const VERSION = "1.3.0";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 8000;
@@ -199,6 +199,7 @@ async function fetchAddon(base, type, id) {
 // Quais destes hashes já estão prontos no TorBox (pedidos de 100 em 100)
 export async function torboxCached(key, hashes) {
   const ready = new Set();
+  ready.checked = new Set();   // hashes que o TorBox confirmou (com ou sem cache)
   if (!key || hashes.length === 0) return ready;
   const chunks = [];
   for (let i = 0; i < hashes.length; i += 100) chunks.push(hashes.slice(i, i + 100));
@@ -210,6 +211,7 @@ export async function torboxCached(key, hashes) {
       });
       if (!r.ok) return;
       const d = await r.json();
+      if (d && d.success === true) for (const h of c) ready.checked.add(h);
       const data = d && d.data;
       if (Array.isArray(data)) {
         for (const x of data) if (x && x.hash) ready.add(String(x.hash).toLowerCase());
@@ -264,6 +266,11 @@ export function curate(items, ready, cfg, cfgRaw, origin) {
       if (it.uncached && it.hash && ready.has(it.hash) && /\[TB/i.test(it.label)) {
         it.cached = true;
         it.label = it.label.replace(/\[TB[^\]]*download\]/i, "[TB+]");
+      }
+      // o add-on diz «pronto» (⚡/+) mas o TorBox diz que não tem: costuma dar o vídeo de espera — passa para trás
+      else if (!it.uncached && it.hash && ready.checked && ready.checked.has(it.hash) && !ready.has(it.hash) && /\[TB[^\]]*\]/i.test(it.label) && !/download\]/i.test(it.label)) {
+        it.cached = false;
+        it.label = it.label.replace(/\[TB[^\]]*\]/i, "[TB download]");
       }
     } else if (it.hash && cfg.k) {
       // fonte «só torrent»: passa a jogável pelo TorBox

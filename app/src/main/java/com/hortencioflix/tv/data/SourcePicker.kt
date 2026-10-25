@@ -45,8 +45,13 @@ object SourcePicker {
         // Nunca salta sozinha para uma fonte que ainda não está no debrid (dá o vídeo «downloading to debrid»).
         val rest = streams.indices.filter { it !in failed && it != current && streams[it].cached }
         if (rest.isEmpty()) return null
+        // Um add-on que já falhou 2 vezes neste vídeo (ex.: links «⚡ prontos» que dão o vídeo de espera)
+        // fica para o fim: não se percorrem as fontes dele uma a uma.
+        val tried = failed + current
+        val bad = tried.mapNotNull { streams.getOrNull(it)?.addon }.groupingBy { it }.eachCount().filterValues { it >= 2 }.keys
+        val pool = rest.filter { streams[it].addon !in bad }.ifEmpty { rest }
         val q = streams.getOrNull(current)?.quality ?: 0
-        return rest.firstOrNull { streams[it].quality == q } ?: rest.first()
+        return pool.firstOrNull { streams[it].quality == q } ?: pool.first()
     }
 
     /** Há pelo menos uma fonte pronta a tocar já? */
