@@ -425,10 +425,20 @@ object Addons {
         // Se falhar ou vier vazio, pede diretamente a cada add-on como antes.
         // Os add-ons que o servidor não conseguiu contactar (alguns bloqueiam servidores na nuvem) são pedidos
         // diretamente por este aparelho e juntam-se ao resultado.
-        val curated = curatorUrl()?.let { cur -> if (bases.isNotEmpty()) curatedStreams(cur, bases, type, id) else null }
-        val direct = curated?.second ?: bases
-        val results = (if (curated != null && (curated.first.optJSONArray("streams")?.length() ?: 0) > 0) listOf(CURATOR to curated.first) else emptyList()) +
-            direct.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }.awaitAll()
+        // Os que falharam lá da última vez (24 h) já nem vão ao servidor: são pedidos aqui, ao mesmo tempo.
+        val cur = curatorUrl()
+        val results: List<Pair<String, JSONObject?>> = if (cur == null || bases.isEmpty()) {
+            bases.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }.awaitAll()
+        } else {
+            val skip = curatorSkip()
+            val viaServer = bases.filter { it !in skip }
+            val early = bases.filter { it in skip }.map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }
+            val curated = if (viaServer.isNotEmpty()) async(Dispatchers.IO) { curatedStreams(cur, viaServer, type, id) }.await() else null
+            val late = (curated?.second ?: viaServer).map { b -> async(Dispatchers.IO) { b to Http.getJson("$b/stream/$type/${pathId(id)}.json") } }
+            if (curated != null) rememberSkip(curated.second)
+            (if (curated != null && (curated.first.optJSONArray("streams")?.length() ?: 0) > 0) listOf(CURATOR to curated.first) else emptyList()) +
+                early.awaitAll() + late.awaitAll()
+        }
         val good = ArrayList<StreamItem>()
         val riskyList = ArrayList<StreamItem>()
         val later = ArrayList<StreamItem>()
@@ -511,6 +521,23 @@ object Addons {
         return android.util.Base64.encodeToString(o.toString().toByteArray(Charsets.UTF_8),
             android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
     }
+
+    /** Add-ons que o servidor não conseguiu contactar recentemente (bloqueiam servidores, lentos): pedem-se diretamente. */
+    private fun curatorSkip(): Set<String> {
+        val o = try { JSONObject(Prefs.str("curSkip").ifEmpty { "{}" }) } catch (e: Exception) { JSONObject() }
+        val now = System.currentTimeMillis()
+        return o.keys().asSequence().filter { o.optLong(it) > now }.toSet()
+    }
+
+    private fun rememberSkip(failed: List<String>) {
+        if (failed.isEmpty()) return
+        val o = try { JSONObject(Prefs.str("curSkip").ifEmpty { "{}" }) } catch (e: Exception) { JSONObject() }
+        val until = System.currentTimeMillis() + 24 * 3600_000L
+        for (b in failed) o.put(b, until)
+        Prefs.put("curSkip", o.toString())
+    }
+
+    fun clearCuratorSkip() = Prefs.remove("curSkip")
 
     /** Add-ons que dão fontes para este título (para o teste do servidor). */
     suspend fun streamBases(type: String, id: String): List<String> = supporting("stream", type, id)

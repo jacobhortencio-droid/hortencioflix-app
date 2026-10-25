@@ -386,43 +386,67 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
     ' se falhar ou vier vazio, pede a cada add-on como antes
     cur = sOr(prefs.curator)
     if Left(LCase(cur), 8) = "https://" and bases.Count() > 0
-        cfg = { a: bases }
-        if sOr(prefs.tbKey) <> "" then cfg.k = prefs.tbKey
-        ba = CreateObject("roByteArray")
-        ba.FromAsciiString(FormatJson(cfg))
-        enc = ba.ToBase64String().Replace("+", "-").Replace("/", "_").Replace("=", "")
-        if Right(cur, 1) = "/" then cur = Left(cur, Len(cur) - 1)
-        one = httpJsonMany([cur + "/" + enc + "/stream/" + mtype + "/" + pathId(id) + ".json"], 25000, 1)
-        d0 = invalid
-        if one.Count() > 0 then d0 = one[0]
-        if d0 <> invalid and type(d0) = "roAssociativeArray" and d0.streams <> invalid and type(d0.streams) = "roArray"
-            ' os add-ons que o servidor não conseguiu contactar são pedidos diretamente pela Roku
-            failed = []
-            st = invalid
-            if d0.hf <> invalid and type(d0.hf) = "roAssociativeArray" then st = d0.hf.addons
-            if st <> invalid and type(st) = "roArray" and st.Count() = bases.Count()
-                for fi = 0 to st.Count() - 1
-                    if st[fi] = invalid or st[fi].ok <> true then failed.Push(bases[fi])
-                end for
-            else if d0.streams.Count() = 0
-                failed = bases
-            end if
-            nb = []
-            data = []
-            if d0.streams.Count() > 0
-                nb.Push("curador")
-                data.Push(d0)
-            end if
-            if failed.Count() > 0
-                furls = []
-                for each b in failed
-                    furls.Push(b + "/stream/" + mtype + "/" + pathId(id) + ".json")
-                    nb.Push(b)
-                end for
-                data.Append(httpJsonMany(furls, 30000, 8))
-            end if
-            bases = nb
+        ' os que falharam no servidor nas últimas 24 h vão diretamente, no mesmo lote que o pedido ao servidor
+        skip = curSkipRead()
+        viaServer = []
+        early = []
+        for each b in bases
+            if skip.DoesExist(curKey(b)) then early.Push(b) else viaServer.Push(b)
+        end for
+        urls = []
+        if viaServer.Count() > 0
+            cfg = { a: viaServer }
+            if sOr(prefs.tbKey) <> "" then cfg.k = prefs.tbKey
+            ba = CreateObject("roByteArray")
+            ba.FromAsciiString(FormatJson(cfg))
+            enc = ba.ToBase64String().Replace("+", "-").Replace("/", "_").Replace("=", "")
+            if Right(cur, 1) = "/" then cur = Left(cur, Len(cur) - 1)
+            urls.Push(cur + "/" + enc + "/stream/" + mtype + "/" + pathId(id) + ".json")
         end if
+        for each b in early
+            urls.Push(b + "/stream/" + mtype + "/" + pathId(id) + ".json")
+        end for
+        got = httpJsonMany(urls, 30000, 8)
+        nb = []
+        data = []
+        failed = []
+        off = 0
+        if viaServer.Count() > 0
+            off = 1
+            d0 = invalid
+            if got.Count() > 0 then d0 = got[0]
+            if d0 <> invalid and type(d0) = "roAssociativeArray" and d0.streams <> invalid and type(d0.streams) = "roArray"
+                st = invalid
+                if d0.hf <> invalid and type(d0.hf) = "roAssociativeArray" then st = d0.hf.addons
+                if st <> invalid and type(st) = "roArray" and st.Count() = viaServer.Count()
+                    for fi = 0 to st.Count() - 1
+                        if st[fi] = invalid or st[fi].ok <> true then failed.Push(viaServer[fi])
+                    end for
+                else if d0.streams.Count() = 0
+                    failed = viaServer
+                end if
+                if d0.streams.Count() > 0
+                    nb.Push("curador")
+                    data.Push(d0)
+                end if
+            else
+                failed = viaServer
+            end if
+        end if
+        for i = 0 to early.Count() - 1
+            nb.Push(early[i])
+            if off + i < got.Count() then data.Push(got[off + i]) else data.Push(invalid)
+        end for
+        if failed.Count() > 0
+            curSkipAdd(skip, failed)
+            furls = []
+            for each b in failed
+                furls.Push(b + "/stream/" + mtype + "/" + pathId(id) + ".json")
+                nb.Push(b)
+            end for
+            data.Append(httpJsonMany(furls, 30000, 8))
+        end if
+        bases = nb
     end if
     if data = invalid
         urls = []
@@ -1687,3 +1711,36 @@ function loadCollection(req as object) as object
     if items.Count() < 2 then return { ok: false }
     return { ok: true, title: sOr(col.name), items: items }
 end function
+
+' ---------- Fontes curadas: add-ons que o servidor não alcança (pedidos diretamente durante 24 h) ----------
+
+function curKey(b as string) as string
+    ba = CreateObject("roByteArray")
+    ba.FromAsciiString(b)
+    d = CreateObject("roEVPDigest")
+    d.Setup("md5")
+    return Left(d.Process(ba), 8)
+end function
+
+function curSkipRead() as object
+    sec = CreateObject("roRegistrySection", "streambox")
+    out = {}
+    if not sec.Exists("curSkip") then return out
+    o = ParseJson(sec.Read("curSkip"))
+    if o = invalid or type(o) <> "roAssociativeArray" then return out
+    now = CreateObject("roDateTime").AsSeconds()
+    for each k in o
+        if o[k] <> invalid and o[k] > now then out[k] = o[k]
+    end for
+    return out
+end function
+
+sub curSkipAdd(skip as object, failed as object)
+    until = CreateObject("roDateTime").AsSeconds() + 24 * 3600
+    for each b in failed
+        skip[curKey(b)] = until
+    end for
+    sec = CreateObject("roRegistrySection", "streambox")
+    sec.Write("curSkip", FormatJson(skip))
+    sec.Flush()
+end sub

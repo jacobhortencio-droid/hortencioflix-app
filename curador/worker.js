@@ -8,12 +8,15 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.1.1";
+const VERSION = "1.2.0";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
-const ADDON_TIMEOUT_MS = 9000;
+const ADDON_TIMEOUT_MS = 8000;
 const MAX_ADDONS = 12;
-const MAX_STREAMS = 150;
+const MAX_CACHED = 300;
+const MAX_OTHER = 60;
+// áudio dobrado em português: nunca fica de fora pelo limite
+const PT_RX = /dublad|dobrad|\bdual\b|pt-?br|\bptbr\b|portugu|\bpor\b|🇧🇷|🇵🇹|nacional/i;
 const CACHE_SECS = 600;
 const VIDEO_RX = /\.(mkv|mp4|avi|m4v|mov|ts|m2ts|webm|wmv)$/i;
 
@@ -184,7 +187,7 @@ async function fetchAddon(base, type, id) {
         return { ok: true, streams: Array.isArray(d && d.streams) ? d.streams : [], status: r.status, ms };
       } catch (e) {
         const n = (e && e.name) || "";
-        return { ok: false, streams: [], status: 0, err: n === "TimeoutError" || n === "AbortError" ? "sem resposta em 9 s" : "erro de rede" };
+        return { ok: false, streams: [], status: 0, err: n === "TimeoutError" || n === "AbortError" ? "sem resposta em 8 s" : "erro de rede" };
       }
     })(),
   ]);
@@ -229,7 +232,7 @@ async function streams(cfg, cfgRaw, type, id, origin, ctx) {
   let order = 0;
   for (const r of results) for (const s of r.streams) if (s && typeof s === "object") items.push(normalize(s, r.name, order++));
 
-  const hashes = [...new Set(items.filter((x) => x.hash).map((x) => x.hash))];
+  const hashes = [...new Set(items.filter((x) => x.hash).map((x) => x.hash))].slice(0, 1500);
   const ready = await torboxCached(cfg.k, hashes);
   const out = curate(items, ready, cfg, cfgRaw, origin);
 
@@ -275,7 +278,14 @@ export function curate(items, ready, cfg, cfgRaw, origin) {
   }
   const list = [...best.values()];
   list.sort((a, b) => (b.cached - a.cached) || (b.q - a.q) || (a.order - b.order));
-  return list.slice(0, MAX_STREAMS).map((it) => {
+  // limite: até 300 prontas e 60 por descarregar, mas as dobradas em português ficam sempre
+  let nc = 0, no = 0;
+  const kept = list.filter((it) => {
+    const pt = PT_RX.test(`${it.label} ${it.detail} ${it.filename}`);
+    if (it.cached) { nc++; return nc <= MAX_CACHED || pt; }
+    no++; return no <= MAX_OTHER || pt;
+  });
+  return kept.map((it) => {
     const o = { ...it.s };
     delete o.infoHash;
     delete o.fileIdx;

@@ -110,6 +110,7 @@ class SettingsActivity : BaseActivity() {
             val r = withContext(Dispatchers.IO) {
                 val h = com.hortencioflix.tv.data.Http.getJson("$u/health")
                 if (h?.optBoolean("ok") != true) return@withContext "O servidor não respondeu. Confirma o endereço."
+                com.hortencioflix.tv.data.Addons.clearCuratorSkip()
                 // um filme conhecido, para ver as fontes a chegar
                 val t0 = android.os.SystemClock.elapsedRealtime()
                 val bases = com.hortencioflix.tv.data.Addons.streamBases("movie", "tt0111161")
