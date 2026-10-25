@@ -2271,13 +2271,13 @@ end function
 
 ' Volta a abrir a MESMA fonte no ponto onde estava (link novo do debrid, ligação nova)
 sub reloadSame(why as string)
-    pos = Int(m.video.position)
-    if pos < 1 then pos = Int(numOr(m.lastPos, 0))
-    logEvent("A retomar a mesma fonte (" + why + ") em " + formatTime(pos))
+    resumeAt = Int(m.video.position)
+    if resumeAt < 1 then resumeAt = Int(numOr(m.lastPos, 0))
+    logEvent("A retomar a mesma fonte (" + why + ") em " + formatTime(resumeAt))
     if m.started and not isLive() then saveLocal(false)
     m.lastReloadAt = CreateObject("roDateTime").AsSeconds()
     m.stallDog.control = "stop"
-    if not isLive() and pos > 5 then m.qualResume = pos
+    if not isLive() and resumeAt > 5 then m.qualResume = resumeAt
     m.video.control = "stop"
     m.attempting = false
     m.started = false
@@ -2326,10 +2326,10 @@ sub onNetTimer()
     try
         if not netUp() then return
         m.netTimer.control = "stop"
-        pos = numOr(m.netWaitPos, 0)
+        resumeAt = numOr(m.netWaitPos, 0)
         m.netWaitPos = 0
-        if not isLive() and pos > 5
-            m.lastPos = pos
+        if not isLive() and resumeAt > 5
+            m.lastPos = resumeAt
             m.started = true
         end if
         reloadSame("a Internet voltou")
