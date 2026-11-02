@@ -1,0 +1,25 @@
+== token (utilizador):
+True active []
+== token (conta):
+False None ['Invalid API Token']
+== contas que o token vê:
+n= 1 Account ID do segredo bate: True tamanho do segredo: 32 []
+== subdomínio workers.dev:
+True {'subdomain': 'hortencioflix'} []
+== armazenamento da sincronização: pronto
+== em direto /health: {"ok":true,"name":"Hortêncioflix · Fontes curadas","version":"1.5.0","sync":true}
+== em direto /stream: {'version': '1.5.0', 'ms': 190, 'addons': [{'name': 'Cinemeta', 'ok': True, 'n': 0, 'status': 404, 'ms': 190, 'err': ''}, {'name': 'Torrentio', 'ok': True, 'n': 100, 'status': 200, 'ms': 19, 'err': ''}], 'checked': 100, 'ready': 0}
+
+ ⛅️ wrangler 4.156.2
+────────────────────
+Total Upload: 21.98 KiB / gzip: 7.68 KiB
+Your Worker has access to the following bindings:
+Binding                                          Resource          
+env.SYNC (07bb3e4aacf249d08b6d138e86dc7291)      KV Namespace      
+
+Uploaded hortencio-fontes (4.13 sec)
+Deployed hortencio-fontes triggers (0.82 sec)
+  https://hortencio-fontes.hortencioflix.workers.dev
+Current Version ID: ***
+
+Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
