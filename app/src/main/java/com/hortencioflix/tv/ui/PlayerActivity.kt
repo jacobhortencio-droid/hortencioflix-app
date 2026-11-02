@@ -390,7 +390,8 @@ class PlayerActivity : BaseActivity() {
 
     /** Primeira fonte: escolhida à mão → toca-se essa; escolhida pela app → corrida entre as melhores. */
     private fun firstStart(ms: Long) {
-        if (Session.autoPick) raceAndPlay(ms, excludeCurrent = false) else startWithMatchedSubs(Session.streamIndex, ms)
+        // escolhida à mão: testa-se primeiro essa (e as seguintes em paralelo, para trocar logo se ela não tiver vídeo)
+        raceAndPlay(ms, excludeCurrent = false, strictFirst = !Session.autoPick)
     }
 
     private var racing: kotlinx.coroutines.Job? = null
@@ -409,15 +410,18 @@ class PlayerActivity : BaseActivity() {
      * Testa as melhores fontes em paralelo (só 1 byte de cada) e toca a primeira que é mesmo um filme.
      * As que dão vídeo de espera, erro ou não respondem ficam marcadas e nunca chegam ao leitor.
      */
-    private fun raceAndPlay(startMs: Long, excludeCurrent: Boolean) {
+    private fun raceAndPlay(startMs: Long, excludeCurrent: Boolean, strictFirst: Boolean = false) {
         val type = Session.meta?.type ?: "movie"
-        val order = candidates(excludeCurrent)
+        val order = candidates(excludeCurrent).let { c ->
+            // escolhida à mão: é essa a primeira a testar, seja qual for o estado
+            if (strictFirst && Session.streamIndex in Session.streams.indices) listOf(Session.streamIndex) + c.filter { it != Session.streamIndex } else c
+        }
         if (order.isEmpty()) { noSourceLeft(); return }
         racing?.cancel()
         beginLoad(if (failedSources.isEmpty()) "A escolher a melhor fonte…" else "A procurar outra fonte…")
         loadStartedAt = 0   // a corrida tem o seu próprio limite de tempo
         racing = lifecycleScope.launch {
-            val pk = SourceRace.pick(Session.streams, order, type) { msg -> if (!isFinishing) showLoading(msg) }
+            val pk = SourceRace.pick(Session.streams, order, type, strictFirst = strictFirst) { msg -> if (!isFinishing) showLoading(msg) }
             if (isFinishing || isDestroyed) return@launch
             for ((i, c) in pk.failed) {
                 if (failedSources.add(i)) {
@@ -432,6 +436,7 @@ class PlayerActivity : BaseActivity() {
                 if (c.finalUrl != s.url && s.headers.isEmpty() && c.finalUrl.startsWith("http")) {
                     Session.streams = Session.streams.toMutableList().also { it[pk.index] = s.copy(url = c.finalUrl) }
                 }
+                if (strictFirst && pk.index != order.first()) toast("A fonte escolhida não tem o vídeo pronto — a tocar outra igual")
                 PlayLog.add("✔ ${PlayLog.label(s)} — escolhida em ${c.ms} ms" + (if (c.sizeBytes > 0) String.format(" · %.1f GB", c.sizeBytes / 1073741824.0) else ""))
                 startWithMatchedSubs(pk.index, startMs)
             } else if (pk.failed.size < order.size || pk.failed.values.all { it.verdict == "não respondeu a tempo" }) {

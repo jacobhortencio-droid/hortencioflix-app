@@ -2263,6 +2263,9 @@ sub scoreCurrent(delta as integer)
         fn = strOr(alts[i].filename)
     end if
     srcScore(strOr(m.md.streamName), q, fn, delta)
+    if alts <> invalid and type(alts) = "roArray" and i < alts.Count() and alts[i] <> invalid
+        if delta > 0 then addonHealthChange(strOr(alts[i].addon), 4) else addonHealthChange(strOr(alts[i].addon), -3)
+    end if
 end sub
 
 ' 3 pausas para carregar em 3 minutos: baixa um nível de qualidade (saltos na barra não contam)

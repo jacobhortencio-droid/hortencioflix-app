@@ -7,6 +7,8 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "Add-ons que falham (ex.: fontes «⚡» de um add-on que dão sempre erro) passam para o fim da lista sozinhos e aparecem no Diagnóstico",
+        "Fonte escolhida à mão: é testada antes; se não tiver o vídeo pronto, a app toca logo outra igual",
         "▶ «Ver» muito mais fiável: antes de começar, a app testa as melhores fontes ao mesmo tempo e toca a primeira que é mesmo o filme — as que dão o vídeo de espera do debrid, erro ou não respondem já não chegam ao leitor",
         "Se uma fonte falhar a meio, a seguinte também é testada antes (acabou o «5 fontes falharam»)",
         "Fontes marcadas «download» também entram no teste: muitas já estão prontas no TorBox",

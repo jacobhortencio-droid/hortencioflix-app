@@ -335,6 +335,7 @@ function startAddonTask(req as object, callback as string) as object
     req.pinFilters = pinnedFilters()
     req.srcStats = cfgRead("srcStats", "{}")
     req.netKbps = Int(Val(cfgRead("netKbps", "0")))
+    req.badAddons = addonBadList()
     ' fontes curadas (servidor próprio): só para pedidos de fontes
     if req.kind = "streams" and cfgRead("curatorOn", "1") = "1"
         req.curator = cfgRead("curatorUrl", "")
@@ -1589,4 +1590,44 @@ function kbpsOf(gb as float, mtype as string) as integer
         mins = 45
     end if
     return Int(gb * 8000000 / (mins * 60))
+end function
+
+' ---------- Saúde de cada add-on (ex.: as fontes «⚡ prontas» de um add-on dão sempre erro) ----------
+' Cada falha -3, cada vídeo que toca +4; esquece ao fim de 48 h sem novidades. Abaixo de -6 = a falhar.
+sub addonHealthChange(addon as string, delta as integer)
+    if addon = "" then return
+    h = ParseJson(cfgRead("addonHealth", "{}"))
+    if h = invalid or type(h) <> "roAssociativeArray" then h = {}
+    h.SetModeCaseSensitive()
+    now = nowEpoch()
+    sc = 0
+    if h.DoesExist(addon) and h[addon] <> invalid and now - Int(numOr(h[addon].t, 0)) < 48 * 3600 then sc = Int(numOr(h[addon].s, 0))
+    sc = sc + delta
+    if sc < -15 then sc = -15
+    if sc > 12 then sc = 12
+    h[addon] = { s: sc, t: now }
+    ' no máximo 15 add-ons guardados (o registo da Roku é pequeno)
+    while h.Count() > 15
+        oldest = ""
+        ot = now + 1
+        for each k in h
+            if Int(numOr(h[k].t, 0)) < ot
+                ot = Int(numOr(h[k].t, 0))
+                oldest = k
+            end if
+        end for
+        h.Delete(oldest)
+    end while
+    cfgWrite("addonHealth", FormatJson(h))
+end sub
+
+function addonBadList() as object
+    out = []
+    h = ParseJson(cfgRead("addonHealth", "{}"))
+    if h = invalid or type(h) <> "roAssociativeArray" then return out
+    now = nowEpoch()
+    for each k in h
+        if h[k] <> invalid and now - Int(numOr(h[k].t, 0)) < 48 * 3600 and Int(numOr(h[k].s, 0)) <= -6 then out.Push(k)
+    end for
+    return out
 end function

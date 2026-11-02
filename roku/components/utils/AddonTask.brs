@@ -47,7 +47,7 @@ sub run_x()
     else if kind = "probe"
         res = probeUrl(req.url, req.headers)
     else if kind = "race"
-        res = raceSources(req.cands, sOr(req.mtype))
+        res = raceSources(req.cands, sOr(req.mtype), req.strict = true)
     else if kind = "shiftsub"
         res = shiftSubtitle(req.src, req.ms)
     else if kind = "torbox"
@@ -550,6 +550,22 @@ function loadStreams(addons as object, mtype as string, id as string, prefs as o
             end for
         end if
     end for
+    ' add-ons que têm falhado (ex.: «⚡ prontas» que dão sempre erro): as fontes deles vão para depois das outras
+    badA = {}
+    if prefs.badAddons <> invalid and type(prefs.badAddons) = "roArray"
+        for each b in prefs.badAddons
+            badA[sOr(b)] = true
+        end for
+    end if
+    if badA.Count() > 0
+        gOk = []
+        gBad = []
+        for each x in good
+            if badA.DoesExist(sOr(x.addon)) then gBad.Push(x) else gOk.Push(x)
+        end for
+        good = gOk
+        riskyList.Append(gBad)
+    end if
     ' dentro de cada grupo, as fontes no idioma preferido vêm primeiro
     good = preferRange(rankDebrid(good, hasDebrid), wantedRange(prefs))
     ' cópias mais pesadas do que a Internet aguenta (ex.: Remux 4K com 15 Mbps) vão para trás: são as que param
@@ -1849,7 +1865,7 @@ function raceCheck(msg as object, mtype as string) as object
     return { ok: true, why: "ok", size: total }
 end function
 
-function raceSources(cands as dynamic, mtype as string) as object
+function raceSources(cands as dynamic, mtype as string, strict = false as boolean) as object
     out = { ok: true, pick: -1, failed: [] }
     if cands = invalid or type(cands) <> "roArray" or cands.Count() = 0 then return out
     port = CreateObject("roMessagePort")
@@ -1898,8 +1914,8 @@ function raceSources(cands as dynamic, mtype as string) as object
                 exit for
             end if
         end for
-        if out.pick < 0
-            ' uma boa mais abaixo, à espera há 2,5 s
+        if out.pick < 0 and not (strict and res[0] = invalid)
+            ' uma boa mais abaixo, à espera há 2,5 s (escolhida à mão: só depois de ela falhar)
             for i = 0 to n - 1
                 if res[i] <> invalid and res[i].ok and t.TotalMilliseconds() - doneAt[i] >= 2500
                     out.pick = i

@@ -73,6 +73,7 @@ object SourceRace {
      * (não se espera por uma fonte lenta quando há uma boa pronta). Desiste ao fim de [budgetMs].
      */
     suspend fun pick(streams: List<StreamItem>, order: List<Int>, type: String, parallel: Int = 3, budgetMs: Long = 20_000,
+                     strictFirst: Boolean = false,
                      onProgress: (String) -> Unit = {}): Pick {
         val cand = order.take(8)
         if (cand.isEmpty()) return Pick(-1, null, emptyMap())
@@ -104,7 +105,10 @@ object SourceRace {
                 if (c.ok) { jobs.values.forEach { if (!it.isCompleted) it.cancel() }; return Pick(i, c, failed) }
             }
             // uma boa mais abaixo, à espera há 2,5 s de outras mais lentas acima
-            val good = cand.firstOrNull { i -> jobs[i]?.isCompleted == true && failed[i] == null && now - (doneAt[i] ?: now) >= 2500 }
+            // (com strictFirst — fonte escolhida à mão — só se troca depois de a escolhida falhar)
+            val firstDone = jobs[cand[0]]?.isCompleted == true
+            val good = if (strictFirst && !firstDone) null
+                else cand.firstOrNull { i -> jobs[i]?.isCompleted == true && failed[i] == null && now - (doneAt[i] ?: now) >= 2500 }
             if (good != null) {
                 jobs.values.forEach { if (!it.isCompleted) it.cancel() }
                 return Pick(good, jobs[good]!!.await(), failed)

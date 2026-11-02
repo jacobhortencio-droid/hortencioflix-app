@@ -82,6 +82,9 @@ class DiagnosticsActivity : ListScreen() {
             }
             rows.add(Row("O que este aparelho toca", com.hortencioflix.tv.data.DeviceCaps.summary()))
             com.hortencioflix.tv.data.DeviceCaps.let { dc -> rows.add(Row("Ecrã HDR", if (dc.hdr) "✅ " + dc.hdrTypes.joinToString(", ") else "❌ este ecrã não é HDR (vídeos HDR são convertidos para SDR)")) }
+            com.hortencioflix.tv.data.SourceStats.badAddons().forEach {
+                rows.add(Row("⚠️ Add-on a falhar", "$it — as fontes dele passam para o fim. Se é sempre assim, reconfigura-o (ex.: chave TorBox na página de configuração do add-on)."))
+            }
             rows.add(header("Últimas reproduções"))
             val log = PlayLog.lines()
             if (log.isEmpty()) rows.add(Row("Ainda sem registo", "Abre um vídeo e volta aqui se alguma fonte falhar"))

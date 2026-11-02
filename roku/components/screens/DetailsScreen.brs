@@ -833,30 +833,39 @@ sub onStreams(event as object)
 end sub
 
 sub quickLaunch()
+    quickLaunchFrom(-1, false)
+end sub
+
+sub quickLaunchFrom(chosen as integer, strict as boolean)
     m.quick = false
+    m.raceStrict = strict
     ' Corrida: testa as melhores fontes ao mesmo tempo (1 byte cada) e toca a primeira que é mesmo vídeo.
     ' As prontas primeiro; as «por descarregar» também entram (às vezes já estão no debrid).
     if m.raceBad = invalid then m.raceBad = {}
     cands = []
     m.raceIdx = []
+    if chosen >= 0 and chosen < m.streams.Count()
+        cands.Push({ url: m.streams[chosen].url, headers: m.streams[chosen].headers })
+        m.raceIdx.Push(chosen)
+    end if
     for rnd = 0 to 1
         for i = 0 to m.streams.Count() - 1
             x = m.streams[i]
             isReady = (x.cached = true)
-            if cands.Count() < 6 and ((rnd = 0 and isReady) or (rnd = 1 and not isReady)) and not m.raceBad.DoesExist(strOr(x.url))
+            if i <> chosen and cands.Count() < 6 and ((rnd = 0 and isReady) or (rnd = 1 and not isReady)) and not m.raceBad.DoesExist(strOr(x.url))
                 cands.Push({ url: x.url, headers: x.headers })
                 m.raceIdx.Push(i)
             end if
         end for
     end for
     if cands.Count() <= 1
-        raceStart(0)
+        if chosen >= 0 then raceStart(chosen) else raceStart(0)
         return
     end if
-    showSpinner(true, "A testar as melhores fontes…")
+    if strict then showSpinner(true, "A verificar a fonte escolhida…") else showSpinner(true, "A testar as melhores fontes…")
     t = "movie"
     if m.top.item <> invalid then t = strOr(m.top.item.type)
-    m.raceTask = startAddonTask({ kind: "race", cands: cands, mtype: t }, "onRace")
+    m.raceTask = startAddonTask({ kind: "race", cands: cands, mtype: t, strict: strict }, "onRace")
 end sub
 
 sub raceStart(idx as integer)
@@ -876,12 +885,14 @@ sub onRace(event as object)
                 i = m.raceIdx[f.i]
                 if i <> invalid and i < m.streams.Count()
                     m.raceBad[strOr(m.streams[i].url)] = true
+                    if strOr(f.why) <> "não respondeu a tempo" then addonHealthChange(strOr(m.streams[i].addon), -3)
                     logEvent("Fonte testada: " + cleanText(strOr(m.streams[i].name)) + " — " + strOr(f.why))
                 end if
                 if strOr(f.why) = "não respondeu a tempo" then timeouts = timeouts + 1
             end for
         end if
         if res.pick <> invalid and res.pick >= 0
+            if boolOr(m.raceStrict) and res.pick > 0 then logEvent("A fonte escolhida não tem o vídeo pronto — a tocar outra")
             raceStart(m.raceIdx[res.pick])
         else if res.failed <> invalid and res.failed.Count() > timeouts
             ' todas as testadas deram vídeo de espera ou erro: mostra a lista para escolher (ou pedir ao TorBox)
@@ -990,6 +1001,9 @@ sub onStreamSelected_x()
             m.top.getScene().dialog = dlg
             return
         end if
+        ' testa a escolhida (e as seguintes ao mesmo tempo): se ela não tiver vídeo, toca logo outra igual
+        quickLaunchFrom(sel, true)
+        return
     end if
     playStream(sel)
 end sub

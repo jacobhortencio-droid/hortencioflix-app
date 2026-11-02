@@ -859,6 +859,7 @@ class DetailsActivity : BaseActivity() {
             if (s.risky) flags.add("⚠ pode falhar")
             com.hortencioflix.tv.data.VideoRange.screenWarning(com.hortencioflix.tv.data.VideoRange.text(s))?.let { flags.add("⚠ $it") }
             com.hortencioflix.tv.data.NetSpeed.warning(s, meta.type)?.let { flags.add("🐢 $it") }
+            if (com.hortencioflix.tv.data.SourceStats.addonBad(s.addon)) flags.add("⚠ este add-on tem falhado")
             v.findViewById<TextView>(R.id.src_badges).text = (flags + inf.badges).joinToString("   ")
             v.findViewById<TextView>(R.id.src_addon).text = s.addon + "  ·  " + s.name.replace("\n", " ")
             v.setOnClickListener { onClick(i) }

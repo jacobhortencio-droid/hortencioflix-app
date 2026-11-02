@@ -490,6 +490,8 @@ object Addons {
         // O que já falhou neste aparelho vai para o fim; o que já tocou bem sobe (sem mudar a ordem do resto).
         val dub = dubPrefFor(id)
         val ready = ready0.sortedWith(compareBy(
+            // add-on que tem falhado (ex.: as fontes «⚡» dão sempre o vídeo de espera): todas as fontes dele vão para o fim
+            { if (SourceStats.addonBad(it.addon)) 1 else 0 },
             { val sc = SourceStats.score(it); if (sc <= -3) 1 else 0 },
             // Preferência de áudio dobrado (PT-BR / PT-PT): essas fontes passam à frente
             { if (dub.isNotEmpty() && AudioLang.matches(AudioLang.of(it), dub)) 0 else 1 },
