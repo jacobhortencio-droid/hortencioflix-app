@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 8000;
@@ -267,11 +267,9 @@ export function curate(items, ready, cfg, cfgRaw, origin) {
         it.cached = true;
         it.label = it.label.replace(/\[TB[^\]]*download\]/i, "[TB+]");
       }
-      // o add-on diz «pronto» (⚡/+) mas o TorBox diz que não tem: costuma dar o vídeo de espera — passa para trás
-      else if (!it.uncached && it.hash && ready.checked && ready.checked.has(it.hash) && !ready.has(it.hash) && /\[TB[^\]]*\]/i.test(it.label) && !/download\]/i.test(it.label)) {
-        it.cached = false;
-        it.label = it.label.replace(/\[TB[^\]]*\]/i, "[TB download]");
-      }
+      // o add-on diz «pronto» mas o TorBox não o confirma: continua pronta (a confirmação do TorBox nem sempre
+      // é completa) mas fica atrás das confirmadas; a app testa-a antes de a tocar
+      if (it.cached && it.hash && ready.checked && ready.checked.has(it.hash) && !ready.has(it.hash)) it.unconfirmed = true;
     } else if (it.hash && cfg.k) {
       // fonte «só torrent»: passa a jogável pelo TorBox
       it.cached = ready.has(it.hash);
@@ -286,7 +284,7 @@ export function curate(items, ready, cfg, cfgRaw, origin) {
     if (!prev || (it.cached && !prev.cached)) best.set(k, it);
   }
   const list = [...best.values()];
-  list.sort((a, b) => (b.cached - a.cached) || (b.q - a.q) || (a.order - b.order));
+  list.sort((a, b) => (b.cached - a.cached) || ((a.unconfirmed ? 1 : 0) - (b.unconfirmed ? 1 : 0)) || (b.q - a.q) || (a.order - b.order));
   // limite: até 300 prontas e 60 por descarregar, mas as dobradas em português ficam sempre
   let nc = 0, no = 0;
   const kept = list.filter((it) => {
@@ -304,7 +302,7 @@ export function curate(items, ready, cfg, cfgRaw, origin) {
     o.addon = it.addon;
     o.behaviorHints = { ...(it.s.behaviorHints || {}) };
     if (it.filename) o.behaviorHints.filename = it.filename;
-    o.hf = { cached: !!it.cached, hash: it.hash || "", q: it.q, gb: Math.round(it.gb * 100) / 100 };
+    o.hf = { cached: !!it.cached, confirmed: !it.unconfirmed, hash: it.hash || "", q: it.q, gb: Math.round(it.gb * 100) / 100 };
     return o;
   });
 }

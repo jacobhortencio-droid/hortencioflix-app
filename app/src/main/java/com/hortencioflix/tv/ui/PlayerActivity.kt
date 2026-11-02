@@ -43,6 +43,7 @@ import com.hortencioflix.tv.data.PlayLog
 import com.hortencioflix.tv.data.SourceStats
 import com.hortencioflix.tv.data.Prefs
 import com.hortencioflix.tv.data.SourcePicker
+import com.hortencioflix.tv.data.SourceRace
 import com.hortencioflix.tv.data.Session
 import com.hortencioflix.tv.data.Stremio
 import kotlinx.coroutines.Dispatchers
@@ -378,13 +379,83 @@ class PlayerActivity : BaseActivity() {
             dialog().setTitle(Session.meta?.name ?: "Continuar a ver?")
                 .setItems(arrayOf("▶  Continuar de ${formatTime(start)}", "↺  Começar do início")) { _, w ->
                     chosen = true
-                    startWithMatchedSubs(Session.streamIndex, if (w == 0) start * 1000 else 0L)
+                    firstStart(if (w == 0) start * 1000 else 0L)
                 }
-                .setOnDismissListener { if (!chosen) startWithMatchedSubs(Session.streamIndex, start * 1000) }
+                .setOnDismissListener { if (!chosen) firstStart(start * 1000) }
                 .show()
         } else {
-            startWithMatchedSubs(Session.streamIndex, start * 1000)
+            firstStart(start * 1000)
         }
+    }
+
+    /** Primeira fonte: escolhida à mão → toca-se essa; escolhida pela app → corrida entre as melhores. */
+    private fun firstStart(ms: Long) {
+        if (Session.autoPick) raceAndPlay(ms, excludeCurrent = false) else startWithMatchedSubs(Session.streamIndex, ms)
+    }
+
+    private var racing: kotlinx.coroutines.Job? = null
+
+    /** Ordem das candidatas: as prontas por ordem de preferência, depois as «por descarregar» (às vezes já estão). */
+    private fun candidates(excludeCurrent: Boolean): List<Int> {
+        val all = Session.streams.indices.filter { it !in failedSources && !(excludeCurrent && it == streamIndex) }
+        // um add-on que já falhou 2 vezes neste vídeo vai para o fim
+        val bad = (failedSources + streamIndex).mapNotNull { Session.streams.getOrNull(it)?.addon }.groupingBy { it }.eachCount().filterValues { it >= 2 }.keys
+        val (ready, later) = all.partition { Session.streams[it].cached }
+        val (r1, r2) = ready.partition { Session.streams[it].addon !in bad }
+        return r1 + r2 + later
+    }
+
+    /**
+     * Testa as melhores fontes em paralelo (só 1 byte de cada) e toca a primeira que é mesmo um filme.
+     * As que dão vídeo de espera, erro ou não respondem ficam marcadas e nunca chegam ao leitor.
+     */
+    private fun raceAndPlay(startMs: Long, excludeCurrent: Boolean) {
+        val type = Session.meta?.type ?: "movie"
+        val order = candidates(excludeCurrent)
+        if (order.isEmpty()) { noSourceLeft(); return }
+        racing?.cancel()
+        beginLoad(if (failedSources.isEmpty()) "A escolher a melhor fonte…" else "A procurar outra fonte…")
+        loadStartedAt = 0   // a corrida tem o seu próprio limite de tempo
+        racing = lifecycleScope.launch {
+            val pk = SourceRace.pick(Session.streams, order, type) { msg -> if (!isFinishing) showLoading(msg) }
+            if (isFinishing || isDestroyed) return@launch
+            for ((i, c) in pk.failed) {
+                if (failedSources.add(i)) {
+                    SourceStats.fail(Session.streams.getOrNull(i))
+                    PlayLog.add("🔎 ${PlayLog.label(Session.streams.getOrNull(i))} — ${c.verdict} (${c.ms} ms)")
+                }
+            }
+            if (pk.index >= 0) {
+                val c = pk.check!!
+                val s = Session.streams[pk.index]
+                // usa já o link final do debrid (evita pedir o link duas vezes = arranque mais rápido)
+                if (c.finalUrl != s.url && s.headers.isEmpty() && c.finalUrl.startsWith("http")) {
+                    Session.streams = Session.streams.toMutableList().also { it[pk.index] = s.copy(url = c.finalUrl) }
+                }
+                PlayLog.add("✔ ${PlayLog.label(s)} — escolhida em ${c.ms} ms" + (if (c.sizeBytes > 0) String.format(" · %.1f GB", c.sizeBytes / 1073741824.0) else ""))
+                startWithMatchedSubs(pk.index, startMs)
+            } else if (pk.failed.size < order.size || pk.failed.values.all { it.verdict == "não respondeu a tempo" }) {
+                // sem certezas (lentas): tenta a primeira como antes
+                startWithMatchedSubs(order.firstOrNull { it !in failedSources } ?: order.first(), startMs)
+            } else noSourceLeft()
+        }
+    }
+
+    /** Nenhuma fonte serve: explica (e, com TorBox, oferece descarregar a melhor e avisar). */
+    private fun noSourceLeft() {
+        hideLoading()
+        val meta = Session.meta
+        val best = TorboxQueue.best(Session.streams)
+        val b = dialog().setTitle("Nenhuma fonte pronta")
+            .setMessage("Testei as fontes deste título: nenhuma tem o vídeo pronto (o serviço debrid devolve o vídeo de espera ou um erro)." +
+                (com.hortencioflix.tv.data.TorboxApi.warning()?.let { "\n\n$it" } ?: "") +
+                (if (best != null && meta != null) "\n\nPosso pedir ao TorBox para descarregar a melhor e avisar-te quando estiver pronta." else "") +
+                "\n\nPormenores em Definições › Diagnóstico › Últimas reproduções.")
+            .setNegativeButton("Sair") { _, _ -> exit() }
+        if (best != null && meta != null) b.setPositiveButton("Descarregar e avisar-me") { _, _ -> TorboxQueue.queue(this, best, meta, Session.videoId) { exit() } }
+            .setNeutralButton("Escolher fonte") { _, _ -> chooseSource() }
+        else b.setPositiveButton("Escolher fonte") { _, _ -> chooseSource() }
+        b.show()
     }
 
     /**
@@ -415,7 +486,13 @@ class PlayerActivity : BaseActivity() {
         showLoading("A preparar o vídeo…")
         lifecycleScope.launch {
             val subsJob = async { try { withTimeoutOrNull(6000) { Addons.subtitles(meta.type, vid) } ?: emptyList() } catch (e: Exception) { emptyList() } }
-            val list = try { Addons.streams(meta.type, vid) } catch (e: Exception) { emptyList() }
+            var list = try { Addons.streams(meta.type, vid) } catch (e: Exception) { emptyList() }
+            if (list.isEmpty()) {
+                // falha passageira (rede, add-on lento) ou filtros demasiado apertados: tenta de novo, sem cache nem limite de qualidade
+                showLoading("A procurar fontes de novo…")
+                PlayLog.add("↻ Sem fontes à primeira — a procurar de novo")
+                list = try { Addons.streams(meta.type, vid, ignoreMax = true, fresh = true) } catch (e: Exception) { emptyList() }
+            }
             val subs = Session.subtitles.ifEmpty { subsJob.await() }
             if (isFinishing || isDestroyed) return@launch
             if (list.isEmpty()) {
@@ -428,19 +505,8 @@ class PlayerActivity : BaseActivity() {
                 return@launch
             }
             Session.vod(meta, vid, list, 0, subs, Session.episodes, Session.startAt)
-            if (!SourcePicker.hasReady(list)) {
-                hideLoading()
-                val best = TorboxQueue.best(list)
-                val b = dialog().setTitle("Ainda a descarregar")
-                    .setMessage("Nenhuma fonte deste título está pronta no teu serviço debrid." + (com.hortencioflix.tv.data.TorboxApi.warning()?.let { "\n\n$it" } ?: "") +
-                        (if (best != null) "\n\nPosso pedir ao TorBox para descarregar a melhor e avisar-te quando estiver pronta." else ""))
-                    .setNegativeButton("Voltar") { _, _ -> exit() }
-                if (best != null) b.setPositiveButton("Descarregar e avisar-me") { _, _ -> TorboxQueue.queue(this@PlayerActivity, best, meta, vid) { exit() } }
-                    .setNeutralButton("Escolher fonte") { _, _ -> chooseSource() }
-                else b.setPositiveButton("Escolher fonte") { _, _ -> chooseSource() }
-                b.show()
-                return@launch
-            }
+            Session.autoPick = true
+            // nenhuma marcada como pronta: a corrida testa-as na mesma (muitas vezes já estão no debrid)
             startPlayback()
         }
     }
@@ -881,8 +947,7 @@ class PlayerActivity : BaseActivity() {
             failedSources.add(streamIndex)
             SourceStats.fail(Session.streams.getOrNull(streamIndex))
             PlayLog.add("⌛ ${PlayLog.label(Session.streams.getOrNull(streamIndex))} — não respondeu a tempo")
-            val next = SourcePicker.nextAfterFail(Session.streams, failedSources, streamIndex) ?: (streamIndex + 1)
-            playStream(next, player?.currentPosition ?: 0L)
+            raceAndPlay(player?.currentPosition ?: 0L, excludeCurrent = true)
         } else {
             hideLoading()
             dialog().setTitle("Nenhuma fonte respondeu")
@@ -975,17 +1040,16 @@ class PlayerActivity : BaseActivity() {
                 .setMessage((com.hortencioflix.tv.data.TorboxApi.warning()?.let { "$it\n\n" } ?: "") + if (parsing) "Estes ficheiros não abrem no leitor da app (formato ou serviço debrid com erro). Podes tentar outras fontes, escolher uma, ou abrir noutra app (ex.: VLC).\n\nÚltimo erro: ${error.errorCodeName}"
                     else "Último erro: ${error.errorCodeName}\n${error.message ?: ""}")
                 .setPositiveButton("Tentar mais fontes") { _, _ ->
-                    SourcePicker.nextAfterFail(Session.streams, failedSources, streamIndex)?.let { playStream(it, pos) } ?: chooseSource()
+                    if (candidates(true).isNotEmpty()) raceAndPlay(pos, excludeCurrent = true) else chooseSource()
                 }
                 .setNeutralButton("Abrir noutra app") { _, _ -> openExternal() }
                 .setNegativeButton("Escolher fonte") { _, _ -> chooseSource() }
                 .show()
             return
         }
-        val alt = SourcePicker.nextAfterFail(Session.streams, failedSources, streamIndex)
-        if (alt != null) {
-            // Troca em silêncio: o pormenor fica em Diagnóstico › Últimas reproduções.
-            playStream(alt, pos)
+        if (candidates(true).isNotEmpty()) {
+            // Troca em silêncio (testando antes as seguintes): o pormenor fica em Diagnóstico › Últimas reproduções.
+            raceAndPlay(pos, excludeCurrent = true)
         } else {
             hideLoading()
             dialog().setTitle("Não foi possível reproduzir")
@@ -1005,10 +1069,8 @@ class PlayerActivity : BaseActivity() {
         PlayLog.add("⚠ ${PlayLog.label(Session.streams.getOrNull(streamIndex))} — " + (if (resumeAt > 0) "parou a meio (${resumeAt / 60000} min)" else "terminou sem tocar (link vazio ou expirado)"))
         SourceStats.fail(Session.streams.getOrNull(streamIndex))
         failedSources.add(streamIndex)
-        val alt = SourcePicker.nextAfterFail(Session.streams, failedSources, streamIndex)
-        if (alt != null) {
-            showLoading(if (resumeAt > 0) "A ligação caiu — a continuar noutra fonte…" else "A procurar a melhor fonte…")
-            playStream(alt, if (resumeAt > 0) resumeAt else Session.startAt)
+        if (candidates(true).isNotEmpty()) {
+            raceAndPlay(if (resumeAt > 0) resumeAt else Session.startAt * 1000, excludeCurrent = true)
             return
         }
         hideLoading()
@@ -1029,10 +1091,8 @@ class PlayerActivity : BaseActivity() {
         PlayLog.add("⏳ ${PlayLog.label(Session.streams.getOrNull(streamIndex))} — vídeo de espera/erro do debrid (${p.duration / 1000} s)")
         SourceStats.fail(Session.streams.getOrNull(streamIndex))
         failedSources.add(streamIndex)
-        val alt = SourcePicker.nextAfterFail(Session.streams, failedSources, streamIndex)
-        if (alt != null) {
-            showLoading("A procurar a melhor fonte…")
-            playStream(alt, Session.startAt)
+        if (candidates(true).isNotEmpty()) {
+            raceAndPlay(Session.startAt * 1000, excludeCurrent = true)
         } else {
             hideLoading()
             // A fonte que tocou o vídeo de espera já está a descarregar: vigiar e avisar quando estiver pronta.

@@ -230,15 +230,30 @@ class DetailsActivity : BaseActivity() {
         val bg = findViewById<ImageView>(R.id.bg_image)
         val scrim = findViewById<View>(R.id.bg_scrim)
         val content = findViewById<LinearLayout>(R.id.content)
+        // O trailer tem a sua própria janela: no ecrã deitado/TV fica à direita, ao lado do texto;
+        // no telemóvel ao alto fica em cima, e o título começa por baixo dele. Nunca por trás do texto.
+        val box = findViewById<FrameLayout>(R.id.trailer_box)
+        val withTrailer = Trailer.autoEnabled()
         if (isLandscape()) {
-            content.setPadding(dp(48), dp(40), (dm.widthPixels * 0.40f).toInt(), dp(32))
+            val tw = (dm.widthPixels * 0.56f).toInt()
+            box.layoutParams = (box.layoutParams as FrameLayout.LayoutParams).apply {
+                width = tw; height = tw * 9 / 16; gravity = android.view.Gravity.TOP or android.view.Gravity.END
+            }
+            findViewById<View>(R.id.trailer_fade).setBackgroundResource(R.drawable.trailer_fade)
+            val endPad = if (withTrailer) (dm.widthPixels * 0.58f).toInt() else (dm.widthPixels * 0.40f).toInt()
+            content.setPadding(dp(48), dp(40), endPad, dp(32))
             btnPlay.layoutParams = (btnPlay.layoutParams as LinearLayout.LayoutParams).apply { width = ViewGroup.LayoutParams.WRAP_CONTENT }
         } else {
             val h = (dm.widthPixels * 0.66f).toInt()
+            val vh = dm.widthPixels * 9 / 16
             bg.layoutParams = (bg.layoutParams as FrameLayout.LayoutParams).apply { height = h }
             scrim.layoutParams = (scrim.layoutParams as FrameLayout.LayoutParams).apply { height = h }
             scrim.setBackgroundResource(R.drawable.scrim_bottom)
-            content.setPadding(dp(20), h - dp(120), dp(20), dp(32))
+            box.layoutParams = (box.layoutParams as FrameLayout.LayoutParams).apply {
+                width = ViewGroup.LayoutParams.MATCH_PARENT; height = vh; gravity = android.view.Gravity.TOP
+            }
+            findViewById<View>(R.id.trailer_fade).setBackgroundResource(R.drawable.trailer_fade_bottom)
+            content.setPadding(dp(20), if (withTrailer) maxOf(h - dp(120), vh + dp(4)) else h - dp(120), dp(20), dp(32))
         }
     }
 
@@ -397,15 +412,13 @@ class DetailsActivity : BaseActivity() {
                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                     // o YouTube demora a mostrar imagem: aparece suavemente só depois, sem ecrã preto
                     if (previewOn) w.postDelayed({
-                        if (previewOn) {
-                            w.animate().alpha(1f).setDuration(1200).start()
-                            findViewById<View>(R.id.bg_image).animate().alpha(0f).setDuration(1200).start()
-                        }
+                        if (previewOn) findViewById<View>(R.id.trailer_box).animate().alpha(1f).setDuration(1200).start()
                     }, 2200)
                 }
             }
-            w.alpha = 0f
-            w.visibility = View.VISIBLE
+            val box = findViewById<View>(R.id.trailer_box)
+            box.alpha = 0f
+            box.visibility = View.VISIBLE
             Trailer.load(w, trailerId, preview = true)
         } catch (e: Throwable) {
             previewOn = false   // sem WebView no aparelho: fica a imagem de fundo
@@ -417,11 +430,11 @@ class DetailsActivity : BaseActivity() {
         w.removeCallbacks(previewStart)
         if (!previewOn) return
         previewOn = false
-        w.animate().cancel()
-        w.alpha = 0f
-        w.visibility = View.GONE
+        val box = findViewById<View>(R.id.trailer_box)
+        box.animate().cancel()
+        box.alpha = 0f
+        box.visibility = View.GONE
         try { w.loadUrl("about:blank") } catch (e: Throwable) {}
-        findViewById<View>(R.id.bg_image).animate().alpha(1f).setDuration(300).start()
     }
 
     override fun onPause() {
@@ -542,7 +555,7 @@ class DetailsActivity : BaseActivity() {
         if (streamsFor == v && streams.isNotEmpty() && SourcePicker.hasReady(streams)) {
             // com filtros escolhidos no painel, o «Ver» começa pela primeira fonte pronta que os cumpre
             val first = if (filters.isEmpty()) null else streams.indices.firstOrNull { streams[it].cached && passes(it) }
-            play(first ?: 0); return
+            play(first ?: 0, auto = true); return
         }
         val m = meta.copy(
             name = titleView.text.toString(),
@@ -550,6 +563,7 @@ class DetailsActivity : BaseActivity() {
             background = full?.optString("background") ?: meta.background
         )
         Session.prepare(m, v, if (streamsFor == v) subs else emptyList(), episodes, Prefs.resumeFor(v, meta.id))
+        Session.autoPick = true
         PlayerActivity.start(this)
     }
 
@@ -590,9 +604,10 @@ class DetailsActivity : BaseActivity() {
                     toast("Sem fontes diretas. Para torrents precisas de um serviço debrid (TorBox, Real-Debrid…) — configura-o nas Definições.")
                 return@launch
             }
-            if (autoPlay && SourcePicker.hasReady(list)) {
+            if (autoPlay && list.isNotEmpty()) {
+                // o leitor testa as melhores fontes e começa pela primeira que é mesmo um vídeo
                 sourcesPanel.visibility = View.GONE
-                play(bestStart())
+                play(0, auto = true)
                 return@launch
             }
             if (autoPlay) {
@@ -605,23 +620,6 @@ class DetailsActivity : BaseActivity() {
             streamsView.animateIn()
             streamsView.post { streamsView.getChildAt(0)?.requestFocus() }
         }
-    }
-
-    /** Testa as primeiras fontes em paralelo e começa pela primeira que responde (sem esperar pelas outras). */
-    private suspend fun bestStart(): Int {
-        val n = minOf(4, streams.takeWhile { it.cached }.size)
-        if (n <= 1) return 0
-        btnPlay.text = "A testar fontes…"
-        val checks = (0 until n).map { i -> lifecycleScope.async(Dispatchers.IO) { Http.probe(streams[i].url, streams[i].headers) } }
-        var pick = 0
-        for (i in 0 until n) {
-            val ok = checks[i].await()
-            if (ok != false) { pick = i; break }   // true ou sem resposta a tempo (pode ser só lento): usar
-            if (i == n - 1) pick = 0
-        }
-        checks.forEach { it.cancel() }
-        updatePlayButton()
-        return pick
     }
 
     // ---------------- Filtros das fontes ----------------
@@ -744,7 +742,7 @@ class DetailsActivity : BaseActivity() {
         else "Nenhuma fonte com estes filtros — toca em «Todas»."
     }
 
-    private fun play(index: Int) {
+    private fun play(index: Int, auto: Boolean = false) {
         if (streams.isEmpty()) return
         val v = streamsFor
         val start = Prefs.resumeFor(v, meta.id)
@@ -759,6 +757,7 @@ class DetailsActivity : BaseActivity() {
         val (same, rest) = if (filters.isEmpty()) others to emptyList() else others.partition { passes(it) }
         val ordered = listOf(streams[index]) + (same + rest).map { streams[it] }
         Session.vod(m, v, ordered, 0, subs, episodes, start)
+        Session.autoPick = auto
         PlayerActivity.start(this)
     }
 

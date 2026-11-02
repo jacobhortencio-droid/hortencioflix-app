@@ -46,6 +46,8 @@ sub run_x()
         res = loadSegments(req.id, req.type)
     else if kind = "probe"
         res = probeUrl(req.url, req.headers)
+    else if kind = "race"
+        res = raceSources(req.cands, sOr(req.mtype))
     else if kind = "shiftsub"
         res = shiftSubtitle(req.src, req.ms)
     else if kind = "torbox"
@@ -1814,4 +1816,106 @@ function speedTest() as object
     eff = ms - 300
     if eff < 200 then eff = ms
     return { ok: true, kbps: Int(size * 8 / eff) }
+end function
+
+' ---------- Corrida de fontes ----------
+' Testa várias fontes ao mesmo tempo pedindo 1 byte (o debrid segue para o ficheiro) e lê o tamanho total:
+' um filme tem centenas de MB; o vídeo de espera do debrid tem poucos. Escolhe a primeira (pela ordem) que é
+' mesmo vídeo; se uma mais abaixo passar e as de cima continuarem caladas 2,5 s, fica com essa.
+
+function raceCheck(msg as object, mtype as string) as object
+    code = msg.GetResponseCode()
+    ct = ""
+    total = -1
+    hdrs = msg.GetResponseHeaders()
+    if hdrs <> invalid
+        for each k in hdrs
+            lk = LCase(k)
+            if lk = "content-type" then ct = LCase(sOr(hdrs[k]))
+            if lk = "content-range"
+                cr = sOr(hdrs[k])
+                p = Instr(1, cr, "/")
+                if p > 0 then total = Val(Mid(cr, p + 1))
+            end if
+            if lk = "content-length" and code = 200 and total < 0 then total = Val(sOr(hdrs[k]))
+        end for
+    end if
+    minB = 0
+    if mtype = "movie" then minB = 60 * 1048576
+    if mtype = "series" or mtype = "anime" then minB = 30 * 1048576
+    if code < 200 or code > 299 then return { ok: false, why: "HTTP " + code.ToStr() }
+    if Left(ct, 5) = "text/" or Instr(1, ct, "json") > 0 or Instr(1, ct, "html") > 0 then return { ok: false, why: "página de erro" }
+    if total > 0 and total < minB then return { ok: false, why: "vídeo de espera (" + Int(total / 1048576).ToStr() + " MB)" }
+    return { ok: true, why: "ok", size: total }
+end function
+
+function raceSources(cands as dynamic, mtype as string) as object
+    out = { ok: true, pick: -1, failed: [] }
+    if cands = invalid or type(cands) <> "roArray" or cands.Count() = 0 then return out
+    port = CreateObject("roMessagePort")
+    xs = {}
+    res = []
+    doneAt = []
+    t = CreateObject("roTimespan")
+    n = cands.Count()
+    if n > 6 then n = 6
+    for i = 0 to n - 1
+        res.Push(invalid)
+        doneAt.Push(-1)
+        x = newXfer(sOr(cands[i].url))
+        x.SetMessagePort(port)
+        x.AddHeader("Range", "bytes=0-0")
+        hs = cands[i].headers
+        if hs <> invalid and type(hs) = "roArray"
+            for each h in hs
+                p = Instr(1, h, ":")
+                if p > 1 then x.AddHeader(Left(h, p - 1), Mid(h, p + 1))
+            end for
+        end if
+        if x.AsyncGetToString()
+            xs[x.GetIdentity().ToStr()] = { x: x, i: i }
+        else
+            res[i] = { ok: false, why: "não arrancou" }
+            doneAt[i] = 0
+        end if
+    end for
+    while t.TotalMilliseconds() < 18000
+        msg = wait(100, port)
+        if type(msg) = "roUrlEvent"
+            k = msg.GetSourceIdentity().ToStr()
+            if xs.DoesExist(k)
+                i = xs[k].i
+                res[i] = raceCheck(msg, mtype)
+                doneAt[i] = t.TotalMilliseconds()
+                xs.Delete(k)
+            end if
+        end if
+        ' a primeira da ordem que passou, com todas as de cima já falhadas
+        for i = 0 to n - 1
+            if res[i] = invalid then exit for
+            if res[i].ok
+                out.pick = i
+                exit for
+            end if
+        end for
+        if out.pick < 0
+            ' uma boa mais abaixo, à espera há 2,5 s
+            for i = 0 to n - 1
+                if res[i] <> invalid and res[i].ok and t.TotalMilliseconds() - doneAt[i] >= 2500
+                    out.pick = i
+                    exit for
+                end if
+            end for
+        end if
+        if out.pick >= 0 or xs.Count() = 0 then exit while
+    end while
+    for each k in xs
+        xs[k].x.AsyncCancel()
+    end for
+    for i = 0 to n - 1
+        if res[i] <> invalid and not res[i].ok then out.failed.Push({ i: i, why: res[i].why })
+        if res[i] = invalid and out.pick < 0 then out.failed.Push({ i: i, why: "não respondeu a tempo" })
+    end for
+    out.tested = n
+    return out
 end function

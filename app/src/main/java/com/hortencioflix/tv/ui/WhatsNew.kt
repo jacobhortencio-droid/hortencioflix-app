@@ -7,6 +7,11 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "▶ «Ver» muito mais fiável: antes de começar, a app testa as melhores fontes ao mesmo tempo e toca a primeira que é mesmo o filme — as que dão o vídeo de espera do debrid, erro ou não respondem já não chegam ao leitor",
+        "Se uma fonte falhar a meio, a seguinte também é testada antes (acabou o «5 fontes falharam»)",
+        "Fontes marcadas «download» também entram no teste: muitas já estão prontas no TorBox",
+        "Sem fontes à primeira (add-on lento, falha de rede)? A app procura de novo sozinha",
+        "🎬 O trailer passa numa janela própria — ao lado do texto na TV, em cima do título no telemóvel — e nunca por trás do texto",
         "🐢 Menos pausas: a app mede a velocidade da tua Internet e põe à frente as cópias que ela aguenta (um Remux 4K precisa de ~60 Mbps). As pesadas demais aparecem com aviso na lista de fontes",
         "Se o vídeo parar várias vezes, a app oferece uma cópia mais leve da mesma qualidade (ex.: 1080p WEB em vez de 1080p Remux) antes de baixar a resolução",
         "Mais reserva no leitor: guarda até 2,5 min à frente e, depois de parar, só retoma com 8 s carregados (acaba o pára-arranca)",

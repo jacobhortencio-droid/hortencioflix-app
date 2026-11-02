@@ -814,11 +814,6 @@ sub quickFromResult(res as object)
         if m.streams.Count() = 0
             m.quick = false
             showStreamList(res)
-        else if m.streams[0].cached = false
-            ' nenhuma fonte pronta no debrid: não tocar o vídeo «downloading to debrid»
-            m.quick = false
-            showStreamList(res)
-            setStatus("Ainda nenhuma fonte está pronta no teu serviço debrid. Escolhe uma (download) para começar a descarregar e volta daqui a alguns minutos.")
         else if m.subsDone
             quickLaunch()
         else
@@ -839,9 +834,68 @@ end sub
 
 sub quickLaunch()
     m.quick = false
+    ' Corrida: testa as melhores fontes ao mesmo tempo (1 byte cada) e toca a primeira que é mesmo vídeo.
+    ' As prontas primeiro; as «por descarregar» também entram (às vezes já estão no debrid).
+    if m.raceBad = invalid then m.raceBad = {}
+    cands = []
+    m.raceIdx = []
+    for rnd = 0 to 1
+        for i = 0 to m.streams.Count() - 1
+            x = m.streams[i]
+            isReady = (x.cached = true)
+            if cands.Count() < 6 and ((rnd = 0 and isReady) or (rnd = 1 and not isReady)) and not m.raceBad.DoesExist(strOr(x.url))
+                cands.Push({ url: x.url, headers: x.headers })
+                m.raceIdx.Push(i)
+            end if
+        end for
+    end for
+    if cands.Count() <= 1
+        raceStart(0)
+        return
+    end if
+    showSpinner(true, "A testar as melhores fontes…")
+    t = "movie"
+    if m.top.item <> invalid then t = strOr(m.top.item.type)
+    m.raceTask = startAddonTask({ kind: "race", cands: cands, mtype: t }, "onRace")
+end sub
+
+sub raceStart(idx as integer)
     setMode("overview")
     focusOn(m.buttons)
-    playStream(0)
+    playStream(idx)
+end sub
+
+sub onRace(event as object)
+    try
+        if m.raceTask = invalid or not event.getRoSGNode().isSameNode(m.raceTask) then return
+        res = event.getData()
+        showSpinner(false, "")
+        timeouts = 0
+        if res.failed <> invalid
+            for each f in res.failed
+                i = m.raceIdx[f.i]
+                if i <> invalid and i < m.streams.Count()
+                    m.raceBad[strOr(m.streams[i].url)] = true
+                    logEvent("Fonte testada: " + cleanText(strOr(m.streams[i].name)) + " — " + strOr(f.why))
+                end if
+                if strOr(f.why) = "não respondeu a tempo" then timeouts = timeouts + 1
+            end for
+        end if
+        if res.pick <> invalid and res.pick >= 0
+            raceStart(m.raceIdx[res.pick])
+        else if res.failed <> invalid and res.failed.Count() > timeouts
+            ' todas as testadas deram vídeo de espera ou erro: mostra a lista para escolher (ou pedir ao TorBox)
+            setMode("overview")
+            m.fromEpisodes = false
+            showStreamList(m.lastRes)
+            setStatus("Testei as melhores fontes e nenhuma tem o vídeo pronto (o debrid dá o vídeo de espera). Escolhe outra, ou uma «download» para o TorBox descarregar.")
+        else
+            ' só lentas: tenta a primeira como antes
+            raceStart(m.raceIdx[0])
+        end if
+    catch e
+        reportCrash("DetailsScreen.onRace", e)
+    end try
 end sub
 
 sub showStreamList(res as object)
@@ -1014,6 +1068,8 @@ sub playStream(sel as integer)
     if m.allStreams <> invalid then order.Append(m.allStreams)
     for each x in order
         u = strOr(x.url)
+        ' as que a corrida já viu que não têm vídeo nem chegam ao leitor
+        if m.raceBad <> invalid and m.raceBad.DoesExist(u) then used[u] = true
         if alts.Count() < 30 and not used.DoesExist(u)
             used[u] = true
             alts.Push(altOf(x))

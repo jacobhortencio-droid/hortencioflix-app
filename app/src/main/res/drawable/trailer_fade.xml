@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- só as bordas: esquerda (ao lado do texto) e fundo; o centro do vídeo fica limpo -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="start|fill_vertical" android:width="72dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="?attr/hfBg" android:endColor="#00000000" />
+        </shape>
+    </item>
+    <item android:gravity="bottom|fill_horizontal" android:height="56dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="90" android:startColor="?attr/hfBg" android:endColor="#00000000" />
+        </shape>
+    </item>
+</layer-list>

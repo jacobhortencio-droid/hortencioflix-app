@@ -18,6 +18,9 @@ object Session {
     /** «Ver» carregado antes de as fontes estarem prontas: o leitor abre já e procura-as ele mesmo. */
     var pending: Boolean = false
 
+    /** A app escolhe a fonte (botão «Ver»): o leitor testa as melhores antes de começar. false = escolhida à mão. */
+    var autoPick: Boolean = false
+
     fun prepare(meta: MetaItem, videoId: String, subs: List<SubtitleItem>, episodes: List<Episode>, startAt: Long) {
         vod(meta, videoId, emptyList(), 0, subs, episodes, startAt)
         pending = true

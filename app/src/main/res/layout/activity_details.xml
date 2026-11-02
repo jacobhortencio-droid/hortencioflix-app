@@ -10,21 +10,36 @@
         android:layout_height="match_parent"
         android:scaleType="centerCrop" />
 
-    <!-- pré-visualização do trailer (sem som) por cima da imagem de fundo -->
-    <WebView
-        android:id="@+id/trailer_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0"
-        android:focusable="false"
-        android:focusableInTouchMode="false"
-        android:visibility="gone" />
-
     <View
         android:id="@+id/bg_scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/scrim" />
+
+    <!-- pré-visualização do trailer (sem som): numa janela própria, ao lado/acima do texto (nunca por trás dele).
+         Tamanho e posição definidos no código conforme o ecrã. -->
+    <FrameLayout
+        android:id="@+id/trailer_box"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_gravity="top|end"
+        android:alpha="0"
+        android:visibility="gone">
+
+        <WebView
+            android:id="@+id/trailer_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:focusable="false"
+            android:focusableInTouchMode="false" />
+
+        <!-- funde a borda do vídeo com o fundo -->
+        <View
+            android:id="@+id/trailer_fade"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/trailer_fade" />
+    </FrameLayout>
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scroll"
