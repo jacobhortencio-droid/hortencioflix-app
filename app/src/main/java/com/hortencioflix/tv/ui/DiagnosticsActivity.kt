@@ -86,6 +86,14 @@ class DiagnosticsActivity : ListScreen() {
             val log = PlayLog.lines()
             if (log.isEmpty()) rows.add(Row("Ainda sem registo", "Abre um vídeo e volta aqui se alguma fonte falhar"))
             for (l in log.take(25)) rows.add(Row(l.substringAfter("  ", l), l.substringBefore("  ")))
+            val crash = java.io.File(filesDir, "prev_crash.txt")
+            if (crash.exists()) {
+                rows.add(header("Último erro da app"))
+                val t = try { crash.readText() } catch (e: Exception) { "" }
+                val lines = t.lines().filter { it.isNotBlank() }
+                val app = lines.filter { it.contains("hortencioflix") }.take(4)
+                rows.add(Row(lines.firstOrNull()?.take(160) ?: "?", (lines.drop(1).take(3) + app).distinct().joinToString("\n").take(900)))
+            }
             progress.visibility = android.view.View.GONE
             val bad = rows.count { it.subtitle.startsWith("❌") }
             setStatus(if (bad == 0) "Tudo a funcionar." else "$bad problema(s) encontrado(s).")

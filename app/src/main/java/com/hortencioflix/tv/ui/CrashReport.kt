@@ -12,6 +12,8 @@ object CrashReport {
         val text = try { f.readText() } catch (e: Exception) { "" }
         f.delete()
         if (text.isEmpty()) return
+        // fica uma cópia para o Diagnóstico (para a podermos ver mesmo que o relatório não seja enviado)
+        try { File(a.filesDir, "prev_crash.txt").writeText(text.take(4000)) } catch (e: Exception) {}
         a.window.decorView.postDelayed({
             if (a.isFinishing) return@postDelayed
             a.dialog().setTitle("A app fechou inesperadamente")
