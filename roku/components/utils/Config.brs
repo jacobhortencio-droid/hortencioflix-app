@@ -1631,3 +1631,41 @@ function addonBadList() as object
     end for
     return out
 end function
+
+' ---------- A fonte exata que estava a tocar em cada vídeo (para retomar com a mesma) ----------
+' Fica num ficheiro (cachefs), não no registo: os links dos add-ons são compridos.
+
+function lastSrcAll() as object
+    o = ParseJson(ReadAsciiFile("cachefs:/last_src.json"))
+    if o = invalid or type(o) <> "roAssociativeArray" then o = {}
+    o.SetModeCaseSensitive()
+    return o
+end function
+
+sub lastSrcSave(videoId as string, s as object)
+    if videoId = "" or s = invalid or Left(LCase(strOr(s.url)), 4) <> "http" then return
+    o = lastSrcAll()
+    if o.DoesExist(videoId) then o.Delete(videoId)
+    o[videoId] = { url: strOr(s.url), filename: strOr(s.filename), name: strOr(s.name), title: Left(strOr(s.title), 200), addon: strOr(s.addon), q: Int(numOr(s.q, 0)), headers: s.headers, at: nowEpoch() }
+    ' no máximo 40: tira os mais antigos
+    while o.Count() > 40
+        oldest = ""
+        ot = nowEpoch() + 1
+        for each k in o
+            if Int(numOr(o[k].at, 0)) < ot
+                ot = Int(numOr(o[k].at, 0))
+                oldest = k
+            end if
+        end for
+        o.Delete(oldest)
+    end while
+    WriteAsciiFile("cachefs:/last_src.json", FormatJson(o))
+end sub
+
+function lastSrcFind(videoId as string) as dynamic
+    o = lastSrcAll()
+    if not o.DoesExist(videoId) then return invalid
+    x = o[videoId]
+    if x = invalid or nowEpoch() - Int(numOr(x.at, 0)) > 30 * 86400 then return invalid
+    return x
+end function

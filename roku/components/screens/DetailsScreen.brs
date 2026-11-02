@@ -833,6 +833,30 @@ sub onStreams(event as object)
 end sub
 
 sub quickLaunch()
+    ' a retomar: a fonte exata que estava a tocar vai para o topo e é testada primeiro
+    vid = strOr(m.top.item.id)
+    if m.currentEp <> invalid then vid = strOr(m.currentEp.id)
+    if findResume(vid, strOr(m.top.item.id)) > 30
+        prev = lastSrcFind(vid)
+        if prev <> invalid
+            idx = -1
+            for i = 0 to m.streams.Count() - 1
+                x = m.streams[i]
+                if strOr(x.url) = prev.url or (prev.filename <> "" and LCase(strOr(x.filename)) = LCase(prev.filename) and strOr(x.addon) = prev.addon) then idx = i
+                if idx >= 0 then exit for
+            end for
+            if idx < 0
+                ' o add-on já não a devolveu: usa o link guardado
+                hs = prev.headers
+                if hs = invalid or type(hs) <> "roArray" then hs = []
+                m.streams.Unshift({ url: prev.url, name: prev.name, title: prev.title, filename: prev.filename, addon: prev.addon, headers: hs, q: prev.q, cached: true, risky: false, debrid: true, dub: "", range: "", src: "", gb: 0, lang: false, heavy: false })
+                idx = 0
+            end if
+            logEvent("A retomar com a mesma fonte: " + cleanText(strOr(prev.name)))
+            quickLaunchFrom(idx, true)
+            return
+        end if
+    end if
     quickLaunchFrom(-1, false)
 end sub
 

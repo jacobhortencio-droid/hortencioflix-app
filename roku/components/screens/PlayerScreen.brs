@@ -516,6 +516,10 @@ sub onState_x()
         m.status.visible = false
         if not m.started and not isLive()
             logEvent("A tocar: " + cleanText(strOr(m.md.streamName)) + "  " + qualityText(currentQuality()))
+            ' guarda a fonte exata (link original do add-on) para retomar com a mesma
+            alts1 = m.md.alts
+            ai1 = Int(numOr(m.md.altIndex, 0))
+            if alts1 <> invalid and type(alts1) = "roArray" and ai1 < alts1.Count() and alts1[ai1] <> invalid then lastSrcSave(strOr(m.md.videoId), alts1[ai1])
             announceRange()
             m.scored = false
         end if

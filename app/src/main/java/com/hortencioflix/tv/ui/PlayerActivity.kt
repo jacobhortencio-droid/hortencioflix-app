@@ -260,7 +260,10 @@ class PlayerActivity : BaseActivity() {
                         if (p.duration > 120_000) reachedLong = true
                         handler.postDelayed({ Prefs.remove("playGuard") }, 15_000)
                     }
-                    if (!reachedReady && !Session.live) Session.meta?.let { m -> Session.streams.getOrNull(streamIndex)?.let { Addons.rememberSource(m.id, it) } }
+                    if (!reachedReady && !Session.live) Session.meta?.let { m -> Session.streams.getOrNull(streamIndex)?.let {
+                        Addons.rememberSource(m.id, it)
+                        com.hortencioflix.tv.data.LastSource.save(Session.videoId, it)
+                    } }
                     if (!reachedReady && !Session.live && subDelayMs == 0L && appliedDelayFor != Session.videoId) {
                         // Atraso das legendas que ajustaste da última vez neste título.
                         appliedDelayFor = Session.videoId
@@ -390,11 +393,29 @@ class PlayerActivity : BaseActivity() {
 
     /** Primeira fonte: escolhida à mão → toca-se essa; escolhida pela app → corrida entre as melhores. */
     private fun firstStart(ms: Long) {
+        // A retomar: a fonte exata que estava a tocar passa para o topo e é testada primeiro
+        // (se o add-on já não a devolver, usa-se o link guardado). Se já não tiver vídeo, segue a corrida normal.
+        if (Session.autoPick && ms > 0) {
+            val prev = com.hortencioflix.tv.data.LastSource.find(Session.videoId)
+            if (prev != null) {
+                var idx = Session.streams.indexOfFirst { com.hortencioflix.tv.data.LastSource.same(it, prev) }
+                if (idx < 0) {
+                    Session.streams = listOf(prev) + Session.streams
+                    idx = 0
+                }
+                Session.streamIndex = idx
+                PlayLog.add("↩ A retomar com a mesma fonte: ${PlayLog.label(prev)}")
+                raceAndPlay(ms, excludeCurrent = false, strictFirst = true)
+                return
+            }
+        }
         // escolhida à mão: testa-se primeiro essa (e as seguintes em paralelo, para trocar logo se ela não tiver vídeo)
         raceAndPlay(ms, excludeCurrent = false, strictFirst = !Session.autoPick)
     }
 
     private var racing: kotlinx.coroutines.Job? = null
+    /** Link final do debrid já obtido no teste (link original → final): o leitor usa-o e não pede outro. */
+    private val resolved = HashMap<String, String>()
 
     /** Ordem das candidatas: as prontas por ordem de preferência, depois as «por descarregar» (às vezes já estão). */
     private fun candidates(excludeCurrent: Boolean): List<Int> {
@@ -433,9 +454,7 @@ class PlayerActivity : BaseActivity() {
                 val c = pk.check!!
                 val s = Session.streams[pk.index]
                 // usa já o link final do debrid (evita pedir o link duas vezes = arranque mais rápido)
-                if (c.finalUrl != s.url && s.headers.isEmpty() && c.finalUrl.startsWith("http")) {
-                    Session.streams = Session.streams.toMutableList().also { it[pk.index] = s.copy(url = c.finalUrl) }
-                }
+                if (c.finalUrl != s.url && s.headers.isEmpty() && c.finalUrl.startsWith("http")) resolved[s.url] = c.finalUrl
                 if (strictFirst && pk.index != order.first()) toast("A fonte escolhida não tem o vídeo pronto — a tocar outra igual")
                 PlayLog.add("✔ ${PlayLog.label(s)} — escolhida em ${c.ms} ms" + (if (c.sizeBytes > 0) String.format(" · %.1f GB", c.sizeBytes / 1073741824.0) else ""))
                 startWithMatchedSubs(pk.index, startMs)
@@ -859,7 +878,8 @@ class PlayerActivity : BaseActivity() {
         Session.streamIndex = index
         // Se a app morrer a meio do arranque desta fonte, no próximo arranque ela fica marcada como má.
         Prefs.put("playGuard", Addons.sourceSignature(s))
-        val b = MediaItem.Builder().setUri(s.url)
+        val playUrl = resolved.remove(s.url) ?: s.url
+        val b = MediaItem.Builder().setUri(playUrl)
         if (s.url.contains(".m3u8", true)) b.setMimeType(MimeTypes.APPLICATION_M3U8)
         if (Prefs.subLang != "off") {
             b.setSubtitleConfigurations(Session.subtitles.mapIndexed { i, sub ->
@@ -872,7 +892,7 @@ class PlayerActivity : BaseActivity() {
             })
         }
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoSize(Int.MAX_VALUE, qualityCap).build()
-        p.setMediaSource(source(s.url, s.headers, b.build()), startMs)
+        p.setMediaSource(source(playUrl, s.headers, b.build()), startMs)
         p.prepare()
         p.playWhenReady = true
         val meta = Session.meta
