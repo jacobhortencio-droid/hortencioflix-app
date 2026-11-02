@@ -46,6 +46,8 @@ sub run_x()
         res = loadSegments(req.id, req.type)
     else if kind = "probe"
         res = probeUrl(req.url, req.headers)
+    else if kind = "cloudsync"
+        res = cloudSyncPost(sOr(req.url), sOr(req.body))
     else if kind = "race"
         res = raceSources(req.cands, sOr(req.mtype), req.strict = true)
     else if kind = "shiftsub"
@@ -1934,4 +1936,22 @@ function raceSources(cands as dynamic, mtype as string, strict = false as boolea
     end for
     out.tested = n
     return out
+end function
+
+' ---------- Sincronização na nuvem (pelo servidor de Fontes curadas) ----------
+function cloudSyncPost(url as string, body as string) as object
+    x = newXfer(url)
+    x.AddHeader("Content-Type", "application/json")
+    port = CreateObject("roMessagePort")
+    x.SetMessagePort(port)
+    if not x.AsyncPostFromString(body) then return { ok: false }
+    msg = wait(20000, port)
+    if type(msg) <> "roUrlEvent"
+        x.AsyncCancel()
+        return { ok: false }
+    end if
+    if msg.GetResponseCode() <> 200 then return { ok: false, code: msg.GetResponseCode() }
+    d = ParseJson(msg.GetString())
+    if d = invalid or d.ok <> true then return { ok: false }
+    return d
 end function

@@ -89,7 +89,8 @@ object RokuSync {
                     // servidor de fontes curadas (vazio = desligado na Roku também)
                     .put("curatorUrl", Prefs.str("curatorUrl"))
                     .put("curatorOn", Prefs.str("curatorOn", "1"))
-                    .put("tmdbKey", Prefs.str("tmdbKey")))
+                    .put("tmdbKey", Prefs.str("tmdbKey"))
+                    .put("cloudSyncId", if (CloudSync.enabled()) CloudSync.id() else ""))
             val ok = try {
                 lan.newCall(Request.Builder().url("$base/sync?k=$k")
                     .post(SyncMerge.asciiJson(body).toRequestBody("application/json".toMediaType())).build())

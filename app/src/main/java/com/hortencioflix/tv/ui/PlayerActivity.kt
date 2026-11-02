@@ -1363,6 +1363,7 @@ class PlayerActivity : BaseActivity() {
         val vid = Session.videoId
         if (pos > dur * 0.92) {
             Prefs.remove("playSession")
+            com.hortencioflix.tv.data.CloudSync.addDone(meta.id)
             Prefs.removeProgress(meta.id)
             Prefs.setWatched(listOf(vid), true)
             com.hortencioflix.tv.data.WatchNext.remove(this, meta.id)
@@ -1779,6 +1780,7 @@ class PlayerActivity : BaseActivity() {
 
     private fun exit() {
         recordBandwidth()
+        if (!Session.live) { saveProgress(false); com.hortencioflix.tv.data.CloudSync.syncQuietly(force = true) }
         Prefs.remove("playSession")
         if (!Session.live) scrobble("stop")
         saveProgress(true)

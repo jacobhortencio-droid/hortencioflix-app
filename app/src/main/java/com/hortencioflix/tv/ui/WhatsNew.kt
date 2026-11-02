@@ -7,6 +7,7 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "☁ Sincronização na nuvem: o que vês na TV aparece no telemóvel e vice-versa, em qualquer rede e sem a Roku ter de estar ligada (pelo teu servidor de Fontes curadas). Na primeira vez, sincroniza uma vez com a Roku aberta para ela receber o código",
         "↩ Retomar usa a mesma fonte: ao continuar um vídeo, a app tenta primeiro o ficheiro exato que estavas a ver (mesmas legendas e áudio); só muda se ele já não tiver vídeo",
         "Add-ons que falham (ex.: fontes «⚡» de um add-on que dão sempre erro) passam para o fim da lista sozinhos e aparecem no Diagnóstico",
         "Fonte escolhida à mão: é testada antes; se não tiver o vídeo pronto, a app toca logo outra igual",

@@ -304,6 +304,10 @@ function handleSync(method as string, path as string, query as string, buf as st
         end if
         tk = d.prefs.tmdbKey
         if tk <> invalid and (type(tk) = "roString" or type(tk) = "String") and tk <> "" and Len(tk) <= 64 then cfgWrite("tmdbKey", tk)
+        cs = d.prefs.cloudSyncId
+        if cs <> invalid and (type(cs) = "roString" or type(cs) = "String") and Len(cs) <= 64
+            if cs = "" then cfgDelete("cloudSyncId") else cfgWrite("cloudSyncId", cs)
+        end if
         co = d.prefs.curatorOn
         if co <> invalid and (co = "0" or co = "1") then cfgWrite("curatorOn", co)
     end if

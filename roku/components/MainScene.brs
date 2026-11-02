@@ -65,6 +65,8 @@ sub init_x()
     m.tbTimer.duration = 600
     m.tbTimer.repeat = true
     m.tbTimer.observeField("fire", "onTbTimer")
+    ' sincronização na nuvem: ao abrir, a cada 10 min (com o temporizador do TorBox) e ao fechar um vídeo
+    cloudSync()
     m.top.appendChild(m.tbTimer)
     m.tbTimer.control = "start"
     ' modo ambiente: com a app parada, as imagens dos teus títulos; OK começa a ver o que está a passar
@@ -524,6 +526,7 @@ sub closePlayer()
     m.screens.visible = true
     focusTopScreen()
     saveNav()
+    cloudSync()
 end sub
 
 function miniActive() as boolean
@@ -850,6 +853,7 @@ end sub
 
 sub onTbTimer()
     try
+        cloudSync()
         w = cfgJsonArray("tbWatch")
         if w.Count() = 0 or cfgRead("torboxKey", "") = "" then return
         hashes = []
@@ -1171,5 +1175,43 @@ sub onSpeedTest(event as object)
         end if
     catch e
         reportCrash("MainScene.onSpeedTest", e)
+    end try
+end sub
+
+' ---------- Sincronização na nuvem ----------
+' «Continuar a ver», vistos e acabados iguais na Roku e no telemóvel, em qualquer rede (pelo servidor de Fontes
+' curadas). O código secreto chega do telemóvel na sincronização local (uma vez). Só no perfil principal.
+sub cloudSync()
+    cur = cfgRead("curatorUrl", "")
+    id = cfgRead("cloudSyncId", "")
+    if Left(LCase(cur), 8) <> "https://" or Len(id) < 20 or currentProfileId() <> "main" then return
+    if m.cloudTask <> invalid and m.cloudTask.state = "run" then return
+    if Right(cur, 1) = "/" then cur = Left(cur, Len(cur) - 1)
+    body = FormatJson({ device: "roku", progress: getProgress(), watchedRoku: cfgJsonArray(pkey("watched")), done: cfgJsonArray(pkey("doneRecent")) })
+    m.cloudTask = startAddonTask({ kind: "cloudsync", url: cur + "/sync/" + id + "?d=roku", body: body }, "onCloudSync")
+end sub
+
+sub onCloudSync(event as object)
+    try
+        r = event.getData()
+        if r = invalid or r.ok <> true then return
+        if r.progress <> invalid and type(r.progress) = "roArray"
+            out = []
+            for each x in r.progress
+                if out.Count() < 12 then out.Push(x)
+            end for
+            cfgWrite(pkey("progress"), FormatJson(out))
+        end if
+        if r.watchedRoku <> invalid and type(r.watchedRoku) = "roArray"
+            w = []
+            for each x in r.watchedRoku
+                if w.Count() < 25 then w.Push(x)
+            end for
+            cfgWrite(pkey("watched"), FormatJson(w))
+        end if
+        logEvent("Sincronizado na nuvem")
+        if m.home <> invalid and m.player = invalid then m.home.refreshLocal = true
+    catch e
+        reportCrash("MainScene.onCloudSync", e)
     end try
 end sub

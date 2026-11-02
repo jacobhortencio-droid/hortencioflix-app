@@ -369,6 +369,7 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Roku: endereço IP", Prefs.str("rokuIp").ifEmpty { "Não definido — na Roku: Definições › Rede › Acerca de" }, tag = "rokuIp"))
         rows.add(Row("Roku: palavra-passe de programador", if (Prefs.str("rokuPass").isNotEmpty()) "Configurada" else "A que escolheste ao ativar o modo de programador", tag = "rokuPass"))
         rows.add(Row("Roku: código de sincronização", Prefs.str("rokuSyncCode").ifEmpty { "Vê na Roku: Definições › Sincronizar com a app Android" }, tag = "rokuSyncCode"))
+        if (Prefs.str("curatorUrl").isNotEmpty()) rows.add(Row("Sincronizar na nuvem", (if (com.hortencioflix.tv.data.CloudSync.enabled()) "Ligado" else "Desligado") + " — «Continuar a ver» e vistos iguais no telemóvel e na Roku em qualquer rede (pelo teu servidor). Toca para sincronizar agora", tag = "cloudSync"))
         rows.add(Row("Sincronizar com a Roku agora", Prefs.str("rokuLastSync").toLongOrNull()?.let { "Última vez: " + java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.US).format(java.util.Date(it)) + " — também é automático" } ?: "«Continuar a ver», vistos, listas e favoritos IPTV iguais nos dois aparelhos", tag = "rokuSync"))
         if (Prefs.str("rokuIp").isNotEmpty()) rows.add(Row("Escrever na TV", "Usa o teclado do telemóvel para escrever na Roku (ex.: na pesquisa)", tag = "rokuType"))
         rows.add(Row("Atualizar a app da Roku agora", Prefs.str("rokuInstalled").let { if (it.isEmpty()) "Envia a versão mais recente para a Roku pela rede" else "Última versão enviada: $it" }, tag = "rokuUpdate"))
@@ -445,6 +446,17 @@ class SettingsActivity : BaseActivity() {
             "trailerAuto" -> { Prefs.put("trailerAuto", if (Prefs.str("trailerAuto", "1") == "1") "0" else "1"); refresh() }
             "postPlay" -> { Prefs.put("postPlay", if (Prefs.str("postPlay", "1") == "1") "0" else "1"); refresh() }
             "curator" -> curatorMenu()
+            "cloudSync" -> choiceDialog("Sincronizar na nuvem", listOf("Sincronizar agora", if (com.hortencioflix.tv.data.CloudSync.enabled()) "Desligar" else "Ligar")) { w ->
+                if (w == 1) { Prefs.put("cloudSync", if (com.hortencioflix.tv.data.CloudSync.enabled()) "0" else "1"); refresh() }
+                else lifecycleScope.launch {
+                    val r = withContext(Dispatchers.IO) {
+                        val a = com.hortencioflix.tv.data.CloudSync.sync(force = true)
+                        // a Roku fica a saber o código (precisa de estar aberta só desta vez)
+                        if (com.hortencioflix.tv.data.RokuSync.configured) com.hortencioflix.tv.data.RokuSync.sync().message.let { b -> "$a\n\nRoku: $b" } else a
+                    }
+                    toast(r)
+                }
+            }
             "ptMeta" -> choiceDialog("Sinopses em português", listOf(if (Prefs.str("ptMeta", "1") == "1") "Desligar" else "Ligar", "Chave TMDB…" + if (Prefs.str("tmdbKey").isNotEmpty()) " (definida)" else "")) { w ->
                 if (w == 0) { Prefs.put("ptMeta", if (Prefs.str("ptMeta", "1") == "1") "0" else "1"); refresh() }
                 else inputDialog("Chave TMDB (API key v3)", "32 letras e números", Prefs.str("tmdbKey")) { k ->
