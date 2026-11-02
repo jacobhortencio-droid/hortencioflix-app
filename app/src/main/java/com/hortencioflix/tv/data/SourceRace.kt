@@ -4,7 +4,8 @@ import android.os.SystemClock
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -63,15 +64,18 @@ object SourceRace {
 
     data class Pick(val index: Int, val check: Check?, val failed: Map<Int, Check>)
 
+    // Os testes correm fora de quem pede: quando a escolha está feita, não se espera pelos mais lentos.
+    private val bg = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /**
      * Escolhe a fonte: testa até [parallel] ao mesmo tempo, pela ordem de [order]. Fica com a primeira da ordem
      * que passa; se uma mais abaixo já passou e as de cima continuam sem resposta 2,5 s depois, fica com essa
      * (não se espera por uma fonte lenta quando há uma boa pronta). Desiste ao fim de [budgetMs].
      */
     suspend fun pick(streams: List<StreamItem>, order: List<Int>, type: String, parallel: Int = 3, budgetMs: Long = 20_000,
-                     onProgress: (String) -> Unit = {}): Pick = coroutineScope {
+                     onProgress: (String) -> Unit = {}): Pick {
         val cand = order.take(8)
-        if (cand.isEmpty()) return@coroutineScope Pick(-1, null, emptyMap())
+        if (cand.isEmpty()) return Pick(-1, null, emptyMap())
         val jobs = LinkedHashMap<Int, Deferred<Check>>()
         val doneAt = HashMap<Int, Long>()
         val failed = LinkedHashMap<Int, Check>()
@@ -80,7 +84,7 @@ object SourceRace {
         fun launchMore() {
             while (next < cand.size && jobs.count { !it.value.isCompleted } < parallel) {
                 val i = cand[next++]
-                jobs[i] = async(Dispatchers.IO) { check(streams[i], type) }
+                jobs[i] = bg.async { check(streams[i], type) }
             }
         }
         launchMore()
@@ -97,13 +101,13 @@ object SourceRace {
                 val j = jobs[i] ?: break
                 if (!j.isCompleted) break
                 val c = j.await()
-                if (c.ok) { jobs.values.forEach { if (!it.isCompleted) it.cancel() }; return@coroutineScope Pick(i, c, failed) }
+                if (c.ok) { jobs.values.forEach { if (!it.isCompleted) it.cancel() }; return Pick(i, c, failed) }
             }
             // uma boa mais abaixo, à espera há 2,5 s de outras mais lentas acima
             val good = cand.firstOrNull { i -> jobs[i]?.isCompleted == true && failed[i] == null && now - (doneAt[i] ?: now) >= 2500 }
             if (good != null) {
                 jobs.values.forEach { if (!it.isCompleted) it.cancel() }
-                return@coroutineScope Pick(good, jobs[good]!!.await(), failed)
+                return Pick(good, jobs[good]!!.await(), failed)
             }
             launchMore()
             val allDone = next >= cand.size && jobs.values.all { it.isCompleted }
@@ -112,6 +116,6 @@ object SourceRace {
             delay(120)
         }
         jobs.values.forEach { if (!it.isCompleted) it.cancel() }
-        Pick(-1, null, failed)
+        return Pick(-1, null, failed)
     }
 }
