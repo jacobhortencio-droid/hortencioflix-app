@@ -48,6 +48,13 @@ jobs:
             done
             sleep 5
           fi
+          # armazenamento da sincronização na nuvem (Workers KV): usa o que existe ou cria-o
+          KVID=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces?per_page=100" | python3 -c "import sys,json;d=json.load(sys.stdin);print(next((x['id'] for x in d.get('result') or [] if x.get('title')=='hortencio-sync'),''))")
+          if [ -z "$KVID" ]; then
+            KVID=$(curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces" -d '{"title":"hortencio-sync"}' | python3 -c "import sys,json;d=json.load(sys.stdin);print((d.get('result') or {}).get('id',''),file=sys.stdout);print([e.get('message') for e in d.get('errors',[])],file=sys.stderr)")
+          fi
+          echo "== armazenamento da sincronização: $([ -n "$KVID" ] && echo pronto || echo 'não foi possível criar (o token precisa de Workers KV Storage: Edit)')" >> /tmp/diag.txt
+          if [ -n "$KVID" ]; then printf '\n[[kv_namespaces]]\nbinding = "SYNC"\nid = "%s"\n' "$KVID" >> curador/wrangler.toml; fi
           cat /tmp/diag.txt
           cd curador
           npx -y wrangler@4 deploy > /tmp/deploy.txt 2>&1

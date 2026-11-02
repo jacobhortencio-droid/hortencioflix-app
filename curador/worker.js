@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 8000;
@@ -24,7 +24,7 @@ export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
     try {
-      return cors(await route(request, ctx));
+      return cors(await route(request, ctx, env));
     } catch (e) {
       // nunca devolver erro ao leitor: lista vazia (a app volta a pedir diretamente aos add-ons)
       return cors(json({ streams: [], error: String((e && e.message) || e) }));
@@ -32,12 +32,13 @@ export default {
   },
 };
 
-async function route(request, ctx) {
+async function route(request, ctx, env) {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
   const origin = url.origin;
   if (parts.length === 0) return landing();
-  if (parts[0] === "health") return json({ ok: true, name: "Hortêncioflix · Fontes curadas", version: VERSION });
+  if (parts[0] === "health") return json({ ok: true, name: "Hortêncioflix · Fontes curadas", version: VERSION, sync: !!(env && env.SYNC) });
+  if (parts[0] === "sync" && parts[1]) return cloudSync(request, parts[1], env);
   if (parts[0] === "manifest.json") return json(manifest(false));
   const cfgRaw = parts[0];
   const cfg = decodeCfg(cfgRaw);
@@ -414,4 +415,127 @@ function landing() {
 <p>A Roku recebe-o pela sincronização.</p>
 <script>document.getElementById("u").textContent=location.origin</script>`;
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
+
+// ---------- Sincronização na nuvem (Android ⇄ Roku, em qualquer rede, sem a Roku ter de estar aberta) ----------
+// Cada casa tem um código secreto (≥ 20 letras) criado pela app Android. Guarda só o essencial:
+// «Continuar a ver», episódios vistos, títulos acabados e os que tiraste da lista. Nada de chaves nem contas.
+
+const SYNC_ID = /^[A-Za-z0-9_-]{20,64}$/;
+
+export function syncMerge(state, inc, now) {
+  const st = {
+    progress: Array.isArray(state.progress) ? state.progress : [],
+    watched: Array.isArray(state.watched) ? state.watched : [],
+    done: state.done && typeof state.done === "object" ? state.done : {},
+    hidden: state.hidden && typeof state.hidden === "object" ? state.hidden : {},
+  };
+  // acabados / retirados (com a hora a que isso aconteceu)
+  for (const m of (Array.isArray(inc.done) ? inc.done : [])) if (typeof m === "string" && m && !st.done[m]) st.done[m] = now;
+  for (const m of (Array.isArray(inc.hidden) ? inc.hidden : [])) if (typeof m === "string" && m) st.hidden[m] = now;
+  // «Continuar a ver»: por título, fica o mais recente
+  const best = new Map();
+  for (const o of [...st.progress, ...(Array.isArray(inc.progress) ? inc.progress : [])]) {
+    if (!o || typeof o.m !== "string" || !o.m) continue;
+    const cur = best.get(o.m);
+    if (!cur || (Number(o.a) || 0) > (Number(cur.a) || 0)) best.set(o.m, {
+      m: o.m, v: String(o.v || ""), t: Number(o.t) || 0, d: Number(o.d) || 0, n: String(o.n || "").slice(0, 120),
+      p: String(o.p || "").slice(0, 300), y: String(o.y || ""), a: Number(o.a) || 0,
+    });
+  }
+  // um título acabado/retirado só volta se for visto de novo depois disso
+  st.progress = [...best.values()]
+    .filter((o) => !(st.done[o.m] && st.done[o.m] >= o.a) && !(st.hidden[o.m] && st.hidden[o.m] >= o.a))
+    .sort((a, b) => b.a - a.a).slice(0, 30);
+  // vistos: junta (formato do Android "tt1:1:2" e o compacto da Roku {m, e:"1:1-8,2:3"})
+  const seen = new Set(st.watched);
+  const add = (id) => { if (typeof id === "string" && id && !seen.has(id)) { seen.add(id); st.watched.push(id); } };
+  for (const id of (Array.isArray(inc.watched) ? inc.watched : [])) add(id);
+  for (const id of rokuToIds(inc.watchedRoku)) add(id);
+  if (st.watched.length > 6000) st.watched = st.watched.slice(-6000);
+  // limites
+  const trim = (o, n) => Object.fromEntries(Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n));
+  st.done = trim(st.done, 400);
+  st.hidden = trim(st.hidden, 200);
+  st.updated = now;
+  return st;
+}
+
+export function rokuToIds(arr) {
+  const out = [];
+  if (!Array.isArray(arr)) return out;
+  for (const o of arr) {
+    if (!o || typeof o.m !== "string") continue;
+    for (const part of String(o.e || "").split(",")) {
+      const c = part.indexOf(":");
+      if (c <= 0) continue;
+      const season = parseInt(part.slice(0, c), 10);
+      const ab = part.slice(c + 1).split("-").map((x) => parseInt(x, 10)).filter((x) => !isNaN(x));
+      if (isNaN(season) || !ab.length) continue;
+      const from = ab[0], to = ab.length > 1 ? ab[1] : ab[0];
+      if (to - from > 500) continue;
+      for (let e = from; e <= to; e++) out.push(`${o.m}:${season}:${e}`);
+    }
+  }
+  return out;
+}
+
+/** Vistos em formato compacto para a Roku (as séries vistas mais recentemente primeiro). */
+export function idsToRoku(ids, limit) {
+  const by = new Map();
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const p = ids[i].split(":");
+    if (p.length !== 3) continue;
+    if (!by.has(p[0])) { if (by.size >= limit) continue; by.set(p[0], new Map()); }
+    const s = by.get(p[0]);
+    const sn = parseInt(p[1], 10), ep = parseInt(p[2], 10);
+    if (isNaN(sn) || isNaN(ep)) continue;
+    if (!s.has(sn)) s.set(sn, new Set());
+    s.get(sn).add(ep);
+  }
+  const out = [];
+  for (const [m, seasons] of by) {
+    const parts = [];
+    for (const [sn, eps] of [...seasons].sort((a, b) => a[0] - b[0])) {
+      const list = [...eps].sort((a, b) => a - b);
+      let a = list[0], prev = list[0];
+      for (let i = 1; i <= list.length; i++) {
+        if (i < list.length && list[i] === prev + 1) { prev = list[i]; continue; }
+        parts.push(`${sn}:${a === prev ? a : a + "-" + prev}`);
+        if (i < list.length) { a = list[i]; prev = list[i]; }
+      }
+    }
+    out.push({ m, e: parts.join(",") });
+  }
+  return out;
+}
+
+function syncView(st, device) {
+  const v = {
+    ok: true,
+    updated: st.updated || 0,
+    progress: (st.progress || []).slice(0, device === "roku" ? 12 : 30),
+    done: Object.keys(st.done || {}),
+    hidden: Object.keys(st.hidden || {}),
+  };
+  if (device === "roku") v.watchedRoku = idsToRoku(st.watched || [], 25);
+  else v.watched = st.watched || [];
+  return v;
+}
+
+async function cloudSync(request, id, env) {
+  if (!env || !env.SYNC) return json({ ok: false, error: "sincronização na nuvem ainda não ativada no servidor" }, 503);
+  if (!SYNC_ID.test(id)) return json({ ok: false, error: "código inválido" }, 400);
+  const key = "s:" + id;
+  const url = new URL(request.url);
+  const device = url.searchParams.get("d") === "roku" ? "roku" : "android";
+  let st = {};
+  try { st = JSON.parse((await env.SYNC.get(key)) || "{}"); } catch (e) { st = {}; }
+  if (request.method === "POST") {
+    let inc = {};
+    try { inc = await request.json(); } catch (e) { return json({ ok: false, error: "dados inválidos" }, 400); }
+    st = syncMerge(st, inc || {}, Math.floor(Date.now() / 1000));
+    await env.SYNC.put(key, JSON.stringify(st));
+  }
+  return json(syncView(st, device));
 }

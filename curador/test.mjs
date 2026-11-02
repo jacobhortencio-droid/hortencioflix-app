@@ -1,6 +1,6 @@
 // Testes do curador (node curador/test.mjs) — sem rede: o fetch é simulado.
 import assert from "node:assert/strict";
-import worker, { encodeCfg, decodeCfg, curate, normalize, pickFile, quality, sizeGb } from "./worker.js";
+import worker, { encodeCfg, decodeCfg, curate, normalize, pickFile, quality, sizeGb, syncMerge, rokuToIds, idsToRoku } from "./worker.js";
 
 const H1 = "a".repeat(40), H2 = "b".repeat(40), H3 = "c".repeat(40);
 const calls = [];
@@ -83,6 +83,33 @@ assert.equal((await r.json()).resources[0], "stream");
 r = await worker.fetch(new Request(`https://cur.test/xyz/stream/movie/tt1.json`), {}, ctx);
 assert.equal(r.status, 400);
 
+// sincronização na nuvem
+{
+  const roku = [{ m: "tt9", e: "1:1-3,2:5" }];
+  assert.deepEqual(rokuToIds(roku), ["tt9:1:1", "tt9:1:2", "tt9:1:3", "tt9:2:5"]);
+  assert.deepEqual(idsToRoku(rokuToIds(roku), 25), roku);
+  let st = syncMerge({}, { progress: [{ m: "tt1", v: "tt1", t: 100, a: 10 }], watched: ["tt9:1:1"] }, 1000);
+  st = syncMerge(st, { progress: [{ m: "tt1", v: "tt1", t: 500, a: 20 }, { m: "tt2", v: "tt2:1:1", t: 50, a: 15 }], watchedRoku: roku }, 1001);
+  assert.equal(st.progress.length, 2);
+  assert.equal(st.progress[0].t, 500);                   // o mais recente ganha
+  assert.equal(st.watched.length, 4);                     // sem repetidos
+  st = syncMerge(st, { done: ["tt2"] }, 1002);
+  assert.equal(st.progress.length, 1);                    // acabado sai da lista
+  st = syncMerge(st, { progress: [{ m: "tt2", v: "tt2:1:2", t: 9, a: 2000 }] }, 2001);
+  assert.equal(st.progress.length, 2);                    // visto de novo depois: volta
+  const env = { SYNC: new Map() };
+  env.SYNC.get = async (k) => Map.prototype.get.call(env.SYNC, k);
+  env.SYNC.put = async (k, v) => Map.prototype.set.call(env.SYNC, k, v);
+  const id = "abcdefghijklmnopqrstuv";
+  let r = await worker.fetch(new Request(`https://cur.test/sync/${id}?d=roku`, { method: "POST", body: JSON.stringify({ progress: [{ m: "tt5", a: 5 }], watchedRoku: roku }) }), env, ctx);
+  let d = await r.json();
+  assert.ok(d.ok && d.progress[0].m === "tt5" && d.watchedRoku[0].m === "tt9");
+  r = await worker.fetch(new Request(`https://cur.test/sync/${id}`), env, ctx);
+  d = await r.json();
+  assert.equal(d.watched.length, 4);
+  r = await worker.fetch(new Request(`https://cur.test/sync/curto`), env, ctx);
+  assert.equal(r.status, 400);
+}
 clearInterval(keep);
 // «⚡ pronto» segundo o add-on, mas o TorBox não tem: passa a por descarregar
 {
