@@ -17,7 +17,7 @@ object XtreamNow {
 
     private val rx = Regex("^(https?://[^/]+)/live/([^/]+)/([^/]+)/(\\d+)\\.[A-Za-z0-9]+$")
     private val cache = ConcurrentHashMap<String, Pair<Long, Now?>>()
-    private val inFlight = ConcurrentHashMap.newKeySet<String>()
+    private val inFlight: MutableSet<String> = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val pool = Executors.newFixedThreadPool(3)
     private val main = Handler(Looper.getMainLooper())
     private const val TTL = 10 * 60_000L
