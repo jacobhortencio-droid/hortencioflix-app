@@ -46,6 +46,14 @@ class ChannelNameTest {
         assertEquals(K.ENT, k("PT - ZAP VIVA UHD", "|PT| INTERNACIONAL"))
         assertEquals(K.ADULT, k("Canal", "ADULTOS +18"))
         assertEquals(K.OTHER, k("Canal 123"))
+        assertEquals(K.NEWS, k("SIC Notícias", "PT | GERAL"))        // grupo vago: vale o nome
+        assertEquals(K.ENT, k("RTP 1", "PT | GERAL"))
+        assertEquals(K.SPORT, k("EVENEMENT SPORT", "4K UHD"))
+        assertEquals(K.ENT, k("TF1", "4K UHD"))
+        assertEquals(K.KIDS, k("JIM JAM", "Canais"))
+        assertEquals(K.MOVIES, k("Canal Hollywood"))
+        assertEquals(K.DOCS, k("Odisseia"))
+        assertEquals(K.NEWS, k("France 24"))
     }
 
     @Test fun regionAndGroupLabel() {

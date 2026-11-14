@@ -7,6 +7,10 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "📺 Canais repetidos juntos: «RTP 1 FHD», «RTP 1 HD» e «RTP 1 SD» passam a ser uma só linha (+2). Abre a melhor versão que a tua Internet aguenta; se falhar, o leitor passa sozinho à seguinte. Mantém premido para escolher a versão",
+        "Tipos de conteúdo mais certeiros (menos canais em «Outros»), também para listas em francês, espanhol, inglês, alemão e turco",
+        "Saíram da lista os falsos canais que são só separadores do fornecedor («##### CRIANÇAS #####»)",
+        "Ícones desenhados em vez de emojis nos botões da página do título e no cadeado do leitor",
         "📺 TV ao vivo por tipo de conteúdo: Desporto, Filmes, Séries, Notícias, Infantil, Documentários, Música… com o número de canais de cada um — a app arruma sozinha os milhares de canais da lista",
         "Filtro por país (Portugal, Brasil, Angola…) quando a lista mistura vários; fica guardado por lista, e a procura passa a ser dentro do tipo e do país escolhidos",
         "Canais em mosaico: um toque no botão ao lado da procura troca a lista por cartões com o logótipo grande",

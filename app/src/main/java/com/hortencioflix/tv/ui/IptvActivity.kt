@@ -62,6 +62,9 @@ class IptvActivity : BaseActivity() {
     private var typeKinds: List<ChannelFacets.Kind?> = emptyList()
     private var regionCounts: List<Pair<String, Int>> = emptyList()
     private var gridMode = false
+    /** Versões do mesmo canal juntas numa linha: endereço do canal mostrado → todas (a preferida primeiro). */
+    private var variants: Map<String, List<Channel>> = emptyMap()
+    private var showJob: kotlinx.coroutines.Job? = null
     private val adultRe = Regex("(adult|xxx|\\+18|18\\+|porn|erotic|for adults)", RegexOption.IGNORE_CASE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,9 +89,10 @@ class IptvActivity : BaseActivity() {
                 IptvVod.open(this, ch) { b -> loader.visibility = if (b) View.VISIBLE else View.GONE; if (b) status.text = "A procurar legendas…" }
             } else {
                 Session.live(shown, i)
+                Session.liveVariants = variants.mapValues { e -> e.value.map { it.url } }
                 PlayerActivity.start(this)
             }
-        }, onLong = { ch -> if (showingFavs) favMenu(ch) else toggleFav(ch) }, onFav = { ch -> toggleFav(ch) })
+        }, onLong = { ch -> if (showingFavs) favMenu(ch) else if (variants[ch.url].orEmpty().size > 1) variantMenu(ch) else toggleFav(ch) }, onFav = { ch -> toggleFav(ch) })
         channelAdapter.favorites = Prefs.favoriteChannels().map { it.url }.toSet()
         gridMode = findViewById<View?>(R.id.btn_view) != null && Prefs.str("iptvGrid") == "1"
         applyViewMode()
@@ -191,13 +195,86 @@ class IptvActivity : BaseActivity() {
     private fun showChannels(input: List<Channel>) {
         val dead = Prefs.deadChannels()
         val list = if (Prefs.hideDead) input.filter { it.url !in dead } else input
+        showJob?.cancel()
+        val merge = !showingFavs && list.size > 1 && Prefs.str("iptvMerge", "1") == "1"
+        if (!merge) { present(list, emptyMap(), dead); return }
+        if (list.size <= 400) {
+            val m = mergeVariants(list, regions)
+            present(m.first, m.second, dead)
+            return
+        }
+        // listas grandes: junta as versões fora do ecrã (a lista anterior fica à vista entretanto)
+        val reg = regions
+        showJob = lifecycleScope.launch {
+            val m = withContext(Dispatchers.Default) { mergeVariants(list, reg) }
+            present(m.first, m.second, dead)
+        }
+    }
+
+    private fun present(list: List<Channel>, vars: Map<String, List<Channel>>, dead: Set<String>) {
         shown = list
+        variants = vars
         if (list.isEmpty() && groups.isNotEmpty() && loader.visibility != View.VISIBLE) status.text = if (search.text.isNotEmpty()) "Nenhum canal com esse nome." else "Este grupo não tem canais (ou estão todos marcados como offline)."
         channelAdapter.dead = dead
         channelAdapter.showGroup = mixedGroup || search.text.isNotEmpty()
+        channelAdapter.hideRegion = if (facetsActive()) regionFilter else ""
+        channelAdapter.variantCount = vars.mapValues { it.value.size }
         channelAdapter.submit(list)
         channelsView.scrollToPosition(0)
         channelsView.post { requestNowForVisible() }
+    }
+
+    /** Resolução de um canal pelos selos do nome: 4 = 4K, 3 = FHD, 2 = HD (ou sem indicação), 1 = SD. */
+    private fun rank(c: Channel): Int {
+        val b = com.hortencioflix.tv.data.ChannelName.of(c.name).badges
+        return when { "4K" in b -> 4; "FHD" in b -> 3; "SD" in b -> 1; else -> 2 }
+    }
+
+    /**
+     * Junta as versões do mesmo canal («RTP 1 FHD», «RTP 1 HD», «RTP 1 SD», cópias) numa só linha. Fica à frente a
+     * melhor que a Internet medida aguenta; as outras servem de reserva se essa falhar e podem ser escolhidas à mão.
+     */
+    private fun mergeVariants(list: List<Channel>, reg: Map<String, String>): Pair<List<Channel>, Map<String, List<Channel>>> {
+        val kbps = com.hortencioflix.tv.data.NetSpeed.kbps()
+        val max = when { kbps <= 0 -> 3; kbps >= 25_000 -> 4; kbps >= 8_000 -> 3; kbps >= 4_000 -> 2; else -> 1 }
+        val byKey = LinkedHashMap<String, MutableList<Channel>>()
+        for (c in list) {
+            val cl = com.hortencioflix.tv.data.ChannelName.of(c.name)
+            val key = (reg[c.url] ?: cl.region) + "|" + cl.name.lowercase()
+            byKey.getOrPut(key) { ArrayList(1) }.add(c)
+        }
+        val out = ArrayList<Channel>(byKey.size)
+        val vars = HashMap<String, List<Channel>>()
+        for (l in byKey.values) {
+            if (l.size == 1) { out.add(l[0]); continue }
+            // primeiro as que a rede aguenta (da melhor para a pior), depois as pesadas demais (da mais leve para a mais pesada)
+            val sorted = l.sortedBy { val r = rank(it); if (r <= max) max - r else 10 + r - max }
+            out.add(sorted[0])
+            vars[sorted[0].url] = sorted
+        }
+        return out to vars
+    }
+
+    /** Manter premido num canal com várias versões: escolher a versão ou marcar favorito. */
+    private fun variantMenu(ch: Channel) {
+        val all = variants[ch.url].orEmpty()
+        val fav = ch.url in channelAdapter.favorites
+        val labels = listOf(if (fav) "★  Remover dos favoritos" else "☆  Adicionar aos favoritos") + all.map { v ->
+            val c = com.hortencioflix.tv.data.ChannelName.of(v.name)
+            "▶  " + c.name + (if (c.badges.isNotEmpty()) "  ·  " + c.badges.joinToString(" · ") else "") + (if (v.group.isNotEmpty()) "   (" + ChannelFacets.groupLabel(v.group) + ")" else "")
+        }
+        choiceDialog(com.hortencioflix.tv.data.ChannelName.of(ch.name).name, labels) { w ->
+            if (w == 0) { toggleFav(ch); return@choiceDialog }
+            val pick = all.getOrNull(w - 1) ?: return@choiceDialog
+            val i = shown.indexOfFirst { it.url == ch.url }
+            if (i < 0) return@choiceDialog
+            // toca a versão escolhida; as restantes ficam como reserva
+            val list = shown.toMutableList()
+            list[i] = pick
+            Session.live(list, i)
+            Session.liveVariants = mapOf(pick.url to (listOf(pick.url) + all.filter { it.url != pick.url }.map { it.url }))
+            PlayerActivity.start(this)
+        }
     }
 
     /** Procura por nome em todos os canais da lista (ignora acentos e maiúsculas). */
@@ -228,13 +305,21 @@ class IptvActivity : BaseActivity() {
         }
     }
 
+    private fun isSeparator(name: String) =
+        name.contains("###") || name.contains("===") || name.contains("***") || name.contains("---") || name.contains("▬▬") || name.contains("━━") || name.contains("•••") || name.contains("★★")
+
     private fun adultLocked() = Prefs.isKids || (Prefs.pin.isNotEmpty() && !adultUnlocked)
 
     private fun setGroups(input: List<ChannelGroup>) {
         val hidden = Prefs.hiddenGroups()
         val locked = adultLocked()
         val visible = input.filter { g -> g.title !in hidden && !(locked && adultRe.containsMatchIn(g.title)) }
-            .map { g -> if (locked && g.title == "Todos") ChannelGroup(g.title, g.channels.filter { !adultRe.containsMatchIn(it.group) }) else g }
+            .map { g ->
+                // os «canais» que são só separadores do fornecedor («##### CRIANÇAS #####») não são canais
+                val real = g.channels.filter { c -> !isSeparator(c.name) && !(locked && g.title == "Todos" && adultRe.containsMatchIn(c.group)) }
+                if (real.size == g.channels.size) g else ChannelGroup(g.title, real)
+            }
+            .filter { it.channels.isNotEmpty() || input.size <= 1 }
         baseGroups = visible
         // índice de pesquisa, logótipos genéricos (o mesmo ícone em muitos canais), tipo de conteúdo e país:
         // tudo calculado fora do ecrã, uma vez por lista

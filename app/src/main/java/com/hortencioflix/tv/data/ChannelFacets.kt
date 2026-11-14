@@ -19,26 +19,42 @@ object ChannelFacets {
     private val rules = listOf(
         Rule(Kind.ADULT, listOf("adult", "xxx", "porn", "erotic")),
         Rule(Kind.KIDS, listOf("kid", "infantil", "infantis", "crianc", "cartoon", "disney", "nick", "panda", "baby", "boomerang",
-            "gloob", "tooncast", "anime", "junior", "desenho", "enfant", "jeunesse", "zig zag", "toon"), listOf("jr")),
+            "gloob", "tooncast", "anime", "junior", "desenho", "enfant", "jeunesse", "zig zag", "kinder", "bambini", "ragazzi",
+            "ninos", "cocuk", "dzieci", "bajki", "gulli", "tiji", "piwi", "canal j", "kika", "boing", "cbeebies", "cbbc", "pogo",
+            "minimax", "jim jam", "jimjam", "biggs"), listOf("jr"), listOf("toon")),
         Rule(Kind.SPORT, listOf("sport", "desport", "esport", "deport", "futebol", "football", "futbol", "soccer", "champions",
             "premier league", "la liga", "laliga", "dazn", "eleven", "benfica", "bein", "espn", "premiere", "combate", "golf",
             "tennis", "tenis", "motogp", "wwe", "fight", "supersport", "ppv", "formula", "eurosport", "liga ", "boxe", "boxing",
-            "racing", "nba", "nfl", "ufc"), listOf("f1", "nhl", "mlb", "btv", "caza y pesca"), listOf("sport")),
+            "racing", "nba", "nfl", "ufc", "calcio", "fussball", "bundesliga", "ligue", "serie a ", "rugby", "cricket", "hockey",
+            "basket", "padel", "wrestling", "evenement", "event", "stadium", "setanta", "tyc", "willow", "viaplay", "olymp",
+            "match", "alkass", "equipe", "foot", "telefoot", "moto"), listOf("f1", "nhl", "mlb", "btv", "mma", "tsn", "ssc", "gol"),
+            listOf("sport")),
         Rule(Kind.NEWS, listOf("notici", "informac", "jornal", "bloomberg", "cnbc", "al jazeera", "aljazeera", "info", "actualit",
-            "nachrichten", "noticias"), listOf("cnn", "rtp3", "rtp 3", "tvi24", "cmtv", "bfm", "lci"), listOf("news")),
-        Rule(Kind.RELIGION, listOf("relig", "gospel", "igreja", "church", "catolic", "cathol", "evangel", "islam", "quran", "christian",
-            "cancao nova", "aparecida", "rede vida", "kuriakos", "biblia", "bible")),
-        Rule(Kind.MUSIC, listOf("music", "musique", "mtv", "vh1", "trace", "radio", "hits", "mezzo", "clubbing", "kizomba", "karaoke")),
-        Rule(Kind.DOCS, listOf("document", "discovery", "national geo", "nat geo", "natgeo", "history", "historia", "odisseia",
-            "animal planet", "travel", "cienc", "science", "cultura", "natur", "bbc earth", "crime", "investiga", "viajar",
-            "planete", "ushuaia", "caca e pesca")),
-        Rule(Kind.MOVIES, listOf("filme", "movie", "cinema", "film", "telecine", "hollywood", "megapix", "box office", "vod"),
-            listOf("hbo", "amc", "tcm", "tnt"), listOf("cine")),
+            "nachricht", "haber", "24h", "cnews", "msnbc", "tagesschau", "france 24", "franceinfo", "bbc world", "i24",
+            "al arabiya", "alarabiya", "tg24", "tgcom", "wiadomosci", "tvn24", "noticiero", "telediario", "24 horas"),
+            listOf("cnn", "rtp3", "rtp 3", "tvi24", "cmtv", "bfm", "lci", "dw", "ntv", "n24", "welt"), listOf("news")),
+        Rule(Kind.RELIGION, listOf("relig", "gospel", "igrej", "church", "catol", "cathol", "evangel", "islam", "quran", "kuran",
+            "christian", "cancao nova", "aparecida", "rede vida", "kuriakos", "biblia", "bible", "ewtn", "daystar", "noursat",
+            "makkah", "peace tv", "jesus", "god tv"), listOf("tbn", "kto", "dini", "iurd")),
+        Rule(Kind.MUSIC, listOf("musique", "musik", "muzik", "muzyk", "mtv", "vh1", "trace", "radio", "hits", "mezzo", "clubbing",
+            "kizomba", "karaoke", "stingray", "jazz", "classica"), listOf("nrj", "mcm", "fm", "kiss", "rock", "rap", "dance"),
+            listOf("music")),
+        Rule(Kind.DOCS, listOf("docu", "doku", "discovery", "national geo", "nat geo", "natgeo", "history", "historia", "histoire",
+            "odisseia", "odisea", "odyssey", "animal planet", "animaux", "travel", "voyage", "viajes", "cienc", "science",
+            "cultura", "natur", "bbc earth", "crime", "investiga", "viajar", "planete", "planeta", "ushuaia", "caca e pesca",
+            "decouverte", "belgesel", "explorer", "viasat", "smithsonian", "curiosity", "savoir", "chasse"),
+            listOf("arte", "geo", "wild")),
+        Rule(Kind.MOVIES, listOf("filme", "movie", "cinema", "film", "telecine", "hollywood", "megapix", "box office", "vod",
+            "kino", "pelicula", "paramount", "action", "thriller", "horror", "terror", "western", "starz", "showtime", "epix",
+            "hallmark", "blockbuster"), listOf("hbo", "amc", "tcm", "tnt", "ocs", "mgm"), listOf("cine")),
         Rule(Kind.SERIES, listOf("serie", "novela", "telenovela", "sitcom", "24 7", "universal", "warner", "sony", "syfy",
-            "star channel", "star life"), listOf("axn", "fox")),
-        Rule(Kind.ENT, listOf("entreten", "entertain", "variedad", "general", "geral", "lifestyle", "culinar", "food", "reality",
-            "comed", "humor", "abertos", "nacionais", "nacional", "generalist", "tv aberta"),
-            listOf("tlc", "sic", "tvi", "rtp", "globo", "record", "sbt", "band", "zap"))
+            "star channel", "star life", "dizi", "drama", "soap", "sky atlantic", "tv show", "shows", "serial"), listOf("axn", "fox")),
+        Rule(Kind.ENT, listOf("entreten", "entertain", "variedad", "variety", "general", "geral", "lifestyle", "culinar", "cuisine",
+            "cooking", "cocina", "food", "reality", "comed", "humor", "abertos", "nacionais", "nacional", "national", "generalist",
+            "tv aberta", "divertissement", "unterhaltung", "intrattenimento", "fashion", "hgtv", "local", "regional", "terrestr",
+            "ulusal", "genel", "free to air"),
+            listOf("tlc", "sic", "tvi", "rtp", "globo", "record", "sbt", "band", "zap", "tf1", "m6", "w9", "tmc", "c8", "rtl", "zdf",
+                "ard", "itv", "rai", "tve", "nbc", "cbs", "abc", "bbc", "antena", "cuatro", "telecinco", "canal+", "fta"))
     )
 
     private val accents = Regex("\\p{Mn}+")
@@ -63,10 +79,15 @@ object ChannelFacets {
         return found
     }
 
-    /** Tipo de conteúdo: primeiro pelo grupo do fornecedor («PT | DESPORTO»), depois pelo nome do canal. */
+    /** Tipo de conteúdo: pelo grupo do fornecedor («PT | DESPORTO») e, quando o grupo é vago, pelo nome do canal. */
     fun kind(ch: Channel): Kind {
         val g = classify(ch.group)
-        return if (g != Kind.OTHER) g else classify(ch.name)
+        // um grupo «geral» não diz muito: se o nome do canal for mais específico (notícias, desporto…), vale o nome
+        if (g == Kind.OTHER || g == Kind.ENT) {
+            val n = classify(ch.name)
+            if (n != Kind.OTHER) return n
+        }
+        return g
     }
 
     // ---------- país / língua ----------

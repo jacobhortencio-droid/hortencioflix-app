@@ -113,11 +113,11 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <TextView android:id="@+id/btn_sources" style="@style/ToggleChip" android:layout_height="42dp" android:text="☰  Fontes" />
+                    <TextView android:id="@+id/btn_sources" style="@style/ToggleChip" android:layout_height="42dp" android:drawableStart="@drawable/ic_list" android:drawablePadding="8dp" android:drawableTint="?attr/hfText" android:text="Fontes" />
                     <TextView android:id="@+id/btn_library" style="@style/ToggleChip" android:layout_height="42dp" android:text="+  Biblioteca" />
-                    <TextView android:id="@+id/btn_trailer" style="@style/ToggleChip" android:layout_height="42dp" android:text="🎬  Trailer" android:visibility="gone" />
-                    <TextView android:id="@+id/btn_tv" style="@style/ToggleChip" android:layout_height="42dp" android:text="📺  Ver na TV" android:visibility="gone" />
-                    <TextView android:id="@+id/btn_share" style="@style/ToggleChip" android:layout_height="42dp" android:text="↗  Partilhar" />
+                    <TextView android:id="@+id/btn_trailer" style="@style/ToggleChip" android:layout_height="42dp" android:drawableStart="@drawable/ic_movie" android:drawablePadding="8dp" android:drawableTint="?attr/hfText" android:text="Trailer" android:visibility="gone" />
+                    <TextView android:id="@+id/btn_tv" style="@style/ToggleChip" android:layout_height="42dp" android:drawableStart="@drawable/ic_cast" android:drawablePadding="8dp" android:drawableTint="?attr/hfText" android:text="Ver na TV" android:visibility="gone" />
+                    <TextView android:id="@+id/btn_share" style="@style/ToggleChip" android:layout_height="42dp" android:drawableStart="@drawable/ic_share" android:drawablePadding="8dp" android:drawableTint="?attr/hfText" android:text="Partilhar" />
                 </LinearLayout>
             </HorizontalScrollView>
 

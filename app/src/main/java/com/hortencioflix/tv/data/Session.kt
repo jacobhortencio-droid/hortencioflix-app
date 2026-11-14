@@ -11,6 +11,8 @@ object Session {
     var channels: List<Channel> = emptyList()
     var channelIndex: Int = 0
     var live: Boolean = false
+    /** Outras versões do mesmo canal (HD, SD, cópias): endereço do canal → endereços por ordem de preferência. */
+    var liveVariants: Map<String, List<String>> = emptyMap()
     var startAt: Long = 0
     /** Para fontes diretas (Xtream, TorBox): obter a fonte de um episódio sem add-ons. */
     var directStream: ((String) -> StreamItem?)? = null
@@ -36,6 +38,7 @@ object Session {
 
     fun live(channels: List<Channel>, index: Int) {
         this.channels = channels; this.channelIndex = index; this.live = true; this.pending = false
+        this.liveVariants = emptyMap()
         this.meta = null; this.streams = emptyList(); this.subtitles = emptyList(); this.episodes = emptyList(); this.startAt = 0
     }
 }

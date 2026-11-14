@@ -62,6 +62,13 @@
                 android:text="Listas" />
 
             <TextView
+                android:id="@+id/btn_region"
+                style="@style/HfChipButton"
+                android:drawableStart="@drawable/ic_globe"
+                android:text="País"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/btn_favs"
                 style="@style/HfChipButton"
                 android:drawableStart="@drawable/ic_star"
@@ -72,13 +79,6 @@
                 style="@style/HfChipButton"
                 android:drawableStart="@drawable/ic_grid"
                 android:text="Guia TV" />
-
-            <TextView
-                android:id="@+id/btn_region"
-                style="@style/HfChipButton"
-                android:drawableStart="@drawable/ic_globe"
-                android:text="País"
-                android:visibility="gone" />
         </LinearLayout>
     </HorizontalScrollView>
 

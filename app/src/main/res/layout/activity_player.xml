@@ -94,7 +94,11 @@
         <TextView
             android:id="@+id/btn_lock"
             style="@style/PlayerChip"
-            android:text="🔒" />
+            android:contentDescription="Bloquear o ecrã"
+            android:drawableStart="@drawable/ic_lock"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="" />
 
         <TextView
             android:id="@+id/btn_subs"
@@ -133,7 +137,9 @@
         android:layout_height="44dp"
         android:layout_gravity="center_vertical|start"
         android:layout_marginStart="24dp"
-        android:text="🔓  Desbloquear"
+        android:drawableStart="@drawable/ic_lock"
+        android:drawablePadding="8dp"
+        android:text="Desbloquear"
         android:visibility="gone" />
 
     <!-- Próximo episódio (contagem) -->

@@ -35,6 +35,10 @@ class ChannelAdapter(
     var showGroup = true
     /** Mosaico (cartões com o logótipo grande) em vez de lista. */
     var grid = false
+    /** País já escolhido no filtro: o selo repetido em todos os canais («PT») não aparece. */
+    var hideRegion = ""
+    /** Quantas versões (SD/HD/FHD/4K, cópias) tem cada canal mostrado — endereço do canal → total. */
+    var variantCount: Map<String, Int> = emptyMap()
 
     fun submit(list: List<Channel>) {
         items = list
@@ -76,8 +80,10 @@ class ChannelAdapter(
         h.url = ch.url
         val clean = ChannelName.of(ch.name)
         h.name.text = clean.name
-        h.badges.text = clean.badges.joinToString(" · ")
-        h.badges.visibility = if (clean.badges.isEmpty()) View.GONE else View.VISIBLE
+        val extra = (variantCount[ch.url] ?: 1) - 1
+        val tags = clean.badges.filter { it != hideRegion }.joinToString(" · ") + (if (extra > 0) (if (clean.badges.any { it != hideRegion }) "  " else "") + "+$extra" else "")
+        h.badges.text = tags
+        h.badges.visibility = if (tags.isEmpty()) View.GONE else View.VISIBLE
         // logótipo real, ou iniciais com cor estável
         initials(h, clean.name)
         h.logo.dispose()

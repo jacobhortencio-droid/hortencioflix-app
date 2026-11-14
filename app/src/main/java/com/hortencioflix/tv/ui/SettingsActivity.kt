@@ -525,6 +525,7 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Posição", listOf("Em baixo", "Mais acima")[Prefs.subPos.coerceIn(0, 1)], tag = "subPos"))
 
         rows.add(header("TV ao vivo"))
+        rows.add(Row("Juntar versões do mesmo canal", onOff(Prefs.str("iptvMerge", "1") == "1") + " — SD, HD, FHD e 4K numa só linha; abre a melhor que a tua Internet aguenta e as outras ficam de reserva", tag = "iptvMerge"))
         rows.add(Row("Guia de programação (EPG)", if (Prefs.epgUrl.isNotEmpty()) Prefs.epgUrl else "Automático — usa o guia indicado pela lista ou pela conta Xtream", tag = "epg"))
 
         rows.add(header("Segurança e dados"))
@@ -634,6 +635,7 @@ class SettingsActivity : BaseActivity() {
                 }
             }
             "pipAuto" -> { Prefs.put("pipAuto", if (Prefs.str("pipAuto", "1") == "1") "0" else "1"); refresh() }
+            "iptvMerge" -> { Prefs.put("iptvMerge", if (Prefs.str("iptvMerge", "1") == "1") "0" else "1"); refresh() }
             "continueTap" -> { Prefs.put("continueTap", if (Prefs.str("continueTap") == "play") "page" else "play"); refresh() }
             "restoreSession" -> { Prefs.put("restoreSession", if (Prefs.str("restoreSession", "1") == "1") "0" else "1"); refresh() }
             "rokuType" -> inputDialog("Escrever na TV", "Nome do filme…", "") { txt ->

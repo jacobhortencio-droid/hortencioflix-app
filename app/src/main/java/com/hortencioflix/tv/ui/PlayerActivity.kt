@@ -995,7 +995,9 @@ class PlayerActivity : BaseActivity() {
                 playLiveUrl(streams[0].url, streams[0].headers)
             }
         } else {
-            chStreams = emptyList()
+            // outras versões do mesmo canal (HD/SD, cópias): se esta falhar, o leitor passa à seguinte sozinho
+            val alt = Session.liveVariants[ch.url].orEmpty()
+            chStreams = if (alt.size > 1) alt.map { u -> com.hortencioflix.tv.data.StreamItem("", ch.name, "", u, "", emptyMap(), 0, true, false) } else emptyList()
             chStreamIdx = 0
             playLiveUrl(ch.url, emptyMap())
         }
