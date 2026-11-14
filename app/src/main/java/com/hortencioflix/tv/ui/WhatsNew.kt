@@ -7,6 +7,9 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "📺 Listas IPTV mais fiáveis: contas Xtream (link get.php ou servidor + utilizador) carregam pela API, como nas outras apps — só os canais ao vivo, muito mais rápido e leve",
+        "Se o servidor IPTV recusar a app, ela tenta com a identificação de outros leitores (VLC, IPTV Smarters…) e lembra-se da que funcionou, também para ver os canais",
+        "Erros claros ao adicionar listas: palavra-passe errada, conta expirada (com a data), servidor em baixo, link que abre uma página web…",
         "☁ Sincronização na nuvem: o que vês na TV aparece no telemóvel e vice-versa, em qualquer rede e sem a Roku ter de estar ligada (pelo teu servidor de Fontes curadas). Na primeira vez, sincroniza uma vez com a Roku aberta para ela receber o código",
         "↩ Retomar usa a mesma fonte: ao continuar um vídeo, a app tenta primeiro o ficheiro exato que estavas a ver (mesmas legendas e áudio); só muda se ele já não tiver vídeo",
         "Add-ons que falham (ex.: fontes «⚡» de um add-on que dão sempre erro) passam para o fim da lista sozinhos e aparecem no Diagnóstico",

@@ -866,7 +866,8 @@ class PlayerActivity : BaseActivity() {
             androidx.media3.datasource.DefaultDataSource.Factory(
                 this,
                 OkHttpDataSource.Factory(Http.client)
-                    .setUserAgent("Hortencioflix-Android/1.0")
+                    // canais IPTV: a identificação que o servidor aceitou ao carregar a lista
+                    .setUserAgent(if (Session.live) com.hortencioflix.tv.data.IptvLoader.uaFor(url) else "Hortencioflix-Android/1.0")
                     .setDefaultRequestProperties(headers)
             )
         ).createMediaSource(item)

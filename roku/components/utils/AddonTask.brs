@@ -820,12 +820,35 @@ function fixIptvUrl(url as string) as string
 end function
 
 function loadM3u(url as string) as object
-    r = httpGet(url, 60000)
-    if not r.ok then return { ok: false, url: url, error: "Não foi possível descarregar a lista (código " + r.code.ToStr() + ")." }
-    body = r.body
-    if Instr(1, body, "#EXTINF") = 0
-        return { ok: false, url: url, error: "O ficheiro não parece ser uma lista M3U (ou está vazio)." }
+    ' Conta Xtream (link get.php): pela API, só os canais ao vivo — o «m3u_plus» traz milhares de filmes e séries
+    ' (dezenas de MB) e a Roku não o consegue carregar
+    lu = LCase(url)
+    if Instr(1, lu, "get.php") > 0 and Instr(1, lu, "username=") > 0
+        xr = loadXtreamLive(url)
+        if xr.ok or xr.fatal = true then return xr
     end if
+    ' alguns servidores IPTV recusam programas que não conhecem: tenta com a identificação de outros leitores
+    r = invalid
+    usedUa = ""
+    lastErr = ""
+    for each ua in iptvUaList(url)
+        r = httpGetUA(url, ua, 60000)
+        if r.ok and Instr(1, r.body, "#EXTINF") > 0
+            usedUa = ua
+            exit for
+        end if
+        if r.ok
+            b = LTrim(Left(r.body, 200))
+            if Left(b, 1) = "<" then lastErr = "O link abre uma página web, não uma lista M3U (bloqueado ou link errado)." else lastErr = "O ficheiro não parece ser uma lista M3U (ou está vazio)."
+        else
+            lastErr = iptvHttpErr(r.code)
+            if r.code = 404 then exit for
+        end if
+        r = invalid
+    end for
+    if r = invalid then return { ok: false, url: url, error: lastErr }
+    iptvUaRemember(url, usedUa)
+    body = r.body
     epgUrl = ""
     hdrEnd = Instr(1, body, Chr(10))
     if hdrEnd > 0
@@ -847,6 +870,9 @@ function loadM3u(url as string) as object
             pending = { name: m3uName(line), logo: m3uAttr(line, "tvg-logo"), group: m3uAttr(line, "group-title"), tid: m3uAttr(line, "tvg-id"), chno: m3uAttr(line, "tvg-chno") }
         else if Left(line, 7) = "#EXTGRP" and pending <> invalid
             pending.group = Mid(line, 9).Trim()
+        else if line <> "" and Left(line, 1) <> "#" and pending <> invalid and (Instr(1, line, "/movie/") > 0 or Instr(1, line, "/series/") > 0)
+            ' filmes e séries de contas Xtream ficam de fora (só canais ao vivo)
+            pending = invalid
         else if line <> "" and Left(line, 1) <> "#" and pending <> invalid
             g = pending.group
             if g = "" then g = "Sem categoria"
@@ -1954,4 +1980,182 @@ function cloudSyncPost(url as string, body as string) as object
     d = ParseJson(msg.GetString())
     if d = invalid or d.ok <> true then return { ok: false }
     return d
+end function
+
+' ---------- Listas IPTV: Xtream pela API, identificação aceite pelo servidor, erros claros ----------
+
+function iptvHost(url as string) as string
+    p = Instr(1, url, "://")
+    if p = 0 then return ""
+    rest = Mid(url, p + 3)
+    e = Instr(1, rest, "/")
+    if e > 0 then rest = Left(rest, e - 1)
+    return LCase(rest)
+end function
+
+function iptvUaList(url as string) as object
+    out = []
+    sec = CreateObject("roRegistrySection", "streambox")
+    k = "iptvUa_" + iptvHost(url)
+    if sec.Exists(k) then out.Push(sec.Read(k))
+    for each ua in ["Hortencioflix/0.4 (Roku)", "VLC/3.0.20 LibVLC/3.0.20", "IPTVSmartersPlayer", "okhttp/4.12.0"]
+        dup = false
+        for each x in out
+            if x = ua then dup = true
+        end for
+        if not dup then out.Push(ua)
+    end for
+    return out
+end function
+
+sub iptvUaRemember(url as string, ua as string)
+    if ua = "" then return
+    sec = CreateObject("roRegistrySection", "streambox")
+    k = "iptvUa_" + iptvHost(url)
+    if ua = "Hortencioflix/0.4 (Roku)"
+        if sec.Exists(k) then sec.Delete(k)
+    else
+        sec.Write(k, ua)
+    end if
+    sec.Flush()
+end sub
+
+function iptvHttpErr(code as integer) as string
+    if code = 401 or code = 403 then return "O servidor recusou o acesso (HTTP " + code.ToStr() + "): conta inválida, expirada ou com o máximo de ligações."
+    if code = 404 then return "A lista não existe nesse endereço (HTTP 404)."
+    if code >= 500 then return "O servidor da lista está com problemas (HTTP " + code.ToStr() + ")."
+    if code <= 0 then return "O servidor não respondeu (endereço/porta errados ou servidor em baixo)."
+    return "O servidor respondeu HTTP " + code.ToStr() + "."
+end function
+
+function httpGetUA(url as string, ua as string, timeoutMs as integer) as object
+    x = CreateObject("roUrlTransfer")
+    x.SetUrl(url)
+    x.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    x.InitClientCertificates()
+    x.EnableEncodings(true)
+    x.RetainBodyOnError(true)
+    x.AddHeader("User-Agent", ua)
+    x.AddHeader("Accept", "*/*")
+    port = CreateObject("roMessagePort")
+    x.SetMessagePort(port)
+    if not x.AsyncGetToString() then return { ok: false, code: 0, body: "" }
+    msg = wait(timeoutMs, port)
+    if type(msg) <> "roUrlEvent"
+        x.AsyncCancel()
+        return { ok: false, code: 0, body: "" }
+    end if
+    code = msg.GetResponseCode()
+    return { ok: code >= 200 and code < 300, code: code, body: msg.GetString() }
+end function
+
+function qsParam(url as string, name as string) as string
+    q = Instr(1, url, "?")
+    if q = 0 then return ""
+    for each kv in Mid(url, q + 1).Split("&")
+        e = Instr(1, kv, "=")
+        if e > 1 and LCase(Left(kv, e - 1)) = name
+            return CreateObject("roUrlTransfer").Unescape(Mid(kv, e + 1))
+        end if
+    end for
+    return ""
+end function
+
+function loadXtreamLive(url as string) as object
+    srv = Left(url, Instr(1, LCase(url), "/get.php") - 1)
+    user = qsParam(url, "username")
+    pass = qsParam(url, "password")
+    if srv = "" or user = "" then return { ok: false, fatal: false }
+    esc = CreateObject("roUrlTransfer")
+    base = srv + "/player_api.php?username=" + esc.Escape(user) + "&password=" + esc.Escape(pass)
+    lastErr = "O servidor não respondeu."
+    for each ua in iptvUaList(url)
+        r = httpGetUA(base, ua, 30000)
+        if not r.ok
+            lastErr = iptvHttpErr(r.code)
+        else
+            d = ParseJson(r.body)
+            if d = invalid or type(d) <> "roAssociativeArray" or d.user_info = invalid
+                if Left(LTrim(r.body), 1) = "<" then lastErr = "O servidor respondeu com uma página web em vez da conta (bloqueado?)." else lastErr = "Resposta inesperada do servidor."
+            else
+                ui = d.user_info
+                if axStr(ui.auth) = "0" then return { ok: false, fatal: true, url: url, error: "Utilizador ou palavra-passe errados." }
+                st = LCase(sOr(ui.status))
+                if st <> "" and st <> "active"
+                    why = "Conta: " + sOr(ui.status)
+                    if st = "expired" then why = "A conta expirou"
+                    if st = "banned" then why = "A conta foi bloqueada pelo fornecedor"
+                    if st = "disabled" then why = "A conta está desativada"
+                    return { ok: false, fatal: true, url: url, error: why + "." }
+                end if
+                iptvUaRemember(url, ua)
+                ' formato: m3u8 corre melhor na Roku; senão ts
+                ext = "m3u8"
+                if ui.allowed_output_formats <> invalid and type(ui.allowed_output_formats) = "roArray" and ui.allowed_output_formats.Count() > 0
+                    hasM = false
+                    for each f in ui.allowed_output_formats
+                        if sOr(f) = "m3u8" then hasM = true
+                    end for
+                    if not hasM then ext = sOr(ui.allowed_output_formats[0])
+                end if
+                cats = {}
+                rc = httpGetUA(base + "&action=get_live_categories", ua, 30000)
+                if rc.ok
+                    ca = ParseJson(rc.body)
+                    if ca <> invalid and type(ca) = "roArray"
+                        for each c in ca
+                            if c <> invalid then cats[axStr(c.category_id)] = sOr(c.category_name)
+                        end for
+                    end if
+                end if
+                rs = httpGetUA(base + "&action=get_live_streams", ua, 60000)
+                if not rs.ok then return { ok: false, fatal: false, url: url, error: "A conta está ativa mas o servidor não enviou os canais." }
+                arr = ParseJson(rs.body)
+                rs = invalid
+                if arr = invalid or type(arr) <> "roArray" then return { ok: false, fatal: false, url: url, error: "A lista de canais do servidor veio inválida." }
+                groups = {}
+                order = []
+                total = 0
+                for each o in arr
+                    if o <> invalid
+                        id = axStr(o.stream_id)
+                        if id <> ""
+                            g = "Outros"
+                            ck = axStr(o.category_id)
+                            if cats.DoesExist(ck) and cats[ck] <> "" then g = cats[ck]
+                            if not groups.DoesExist(g)
+                                groups[g] = []
+                                order.Push(g)
+                            end if
+                            total = total + 1
+                            nm = sOr(o.name)
+                            if nm = "" then nm = "Canal " + total.ToStr()
+                            num = total
+                            nn = Int(Val(axStr(o.num)))
+                            if nn > 0 then num = nn
+                            groups[g].Push({ name: nm, logo: sOr(o.stream_icon), url: srv + "/live/" + user + "/" + pass + "/" + id + "." + ext, tid: sOr(o.epg_channel_id), num: num })
+                            if total >= 15000 then exit for
+                        end if
+                    end if
+                end for
+                out = []
+                for each g in order
+                    out.Push({ title: g, channels: groups[g] })
+                end for
+                epg = srv + "/xmltv.php?username=" + esc.Escape(user) + "&password=" + esc.Escape(pass)
+                return { ok: total > 0, fatal: total = 0, url: url, groups: out, total: total, epgUrl: epg, error: "A conta está ativa mas não tem canais ao vivo." }
+            end if
+        end if
+    end for
+    return { ok: false, fatal: false, url: url, error: lastErr }
+end function
+
+' número ou texto → texto (as APIs Xtream mandam ids das duas formas)
+function axStr(v as dynamic) as string
+    if v = invalid then return ""
+    t = type(v)
+    if t = "roString" or t = "String" then return v
+    if t = "roInt" or t = "Integer" or t = "LongInteger" or t = "roLongInteger" then return v.ToStr()
+    if t = "roFloat" or t = "Float" or t = "Double" or t = "roDouble" then return Int(v).ToStr()
+    return ""
 end function

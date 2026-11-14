@@ -274,18 +274,30 @@ class IptvActivity : BaseActivity() {
                 val cache = java.io.File(java.io.File(cacheDir, "iptv").apply { mkdirs() }, Integer.toHexString(url.hashCode()) + ".m3u")
                 val fresh = cache.exists() && System.currentTimeMillis() - cache.lastModified() < 6 * 3600_000L
                 text = if (fresh) withContext(Dispatchers.IO) { try { cache.readText() } catch (e: Exception) { null } } else null
+                var loadErr: String? = null
+                var netParsed: List<ChannelGroup>? = null
                 if (text == null) {
-                    val net = withContext(Dispatchers.IO) { Http.getString(url) }
-                    if (net != null) {
-                        withContext(Dispatchers.IO) { try { cache.writeText(net) } catch (e: Exception) {} }
-                        text = net
-                    } else if (cache.exists()) {
-                        // Sem ligação: usar a cópia antiga.
-                        text = withContext(Dispatchers.IO) { try { cache.readText() } catch (e: Exception) { null } }
+                    status.text = "A carregar lista… (contas Xtream pela API, só os canais ao vivo)"
+                    val res = withContext(Dispatchers.IO) { com.hortencioflix.tv.data.IptvLoader.load(url) }
+                    if (res.m3uText != null && res.groups.isNotEmpty()) {
+                        withContext(Dispatchers.IO) { try { cache.writeText(res.m3uText) } catch (e: Exception) {} }
+                        text = res.m3uText
+                        netParsed = res.groups
+                    } else {
+                        loadErr = res.error
+                        if (cache.exists()) {
+                            // Sem ligação / servidor em baixo: usar a cópia antiga.
+                            text = withContext(Dispatchers.IO) { try { cache.readText() } catch (e: Exception) { null } }
+                        }
                     }
                 }
                 val t = text
-                parsed = if (t == null) emptyList() else withContext(Dispatchers.Default) { Iptv.parse(t) }
+                parsed = netParsed ?: if (t == null) emptyList() else withContext(Dispatchers.Default) { Iptv.parse(t, 20000) }
+                if (parsed.isEmpty() && loadErr != null) {
+                    status.text = loadErr
+                    retry.visibility = View.VISIBLE
+                    return
+                }
             }
             if (parsed.isEmpty()) {
                 status.text = if (text == null) "Não foi possível descarregar a lista (link inválido ou servidor em baixo)." else "A lista não tem canais reconhecidos."

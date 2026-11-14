@@ -445,6 +445,18 @@ sub startPlayback(curPos as integer, tracks as object)
     if tracks.Count() > 0 then c.SubtitleTracks = tracks
     m.curTracks = tracks
     if md.headers <> invalid and type(md.headers) = "roArray" and md.headers.Count() > 0 then c.HttpHeaders = md.headers
+    ' canais IPTV: a identificação que o servidor aceitou ao carregar a lista
+    if isLive() and (md.headers = invalid or type(md.headers) <> "roArray" or md.headers.Count() = 0)
+        u0 = strOr(md.url)
+        p0 = Instr(1, u0, "://")
+        if p0 > 0
+            h0 = Mid(u0, p0 + 3)
+            e0 = Instr(1, h0, "/")
+            if e0 > 0 then h0 = Left(h0, e0 - 1)
+            sec0 = CreateObject("roRegistrySection", "streambox")
+            if sec0.Exists("iptvUa_" + LCase(h0)) then c.HttpHeaders = ["User-Agent:" + sec0.Read("iptvUa_" + LCase(h0))]
+        end if
+    end if
     setStatus("A carregar…")
     m.attempting = true
     m.autoSubDone = false
