@@ -1,5 +1,7 @@
 package com.hortencioflix.tv
 
+import com.hortencioflix.tv.data.ChannelFacets
+import com.hortencioflix.tv.data.ChannelFacets.Kind as K
 import com.hortencioflix.tv.data.ChannelName
 import com.hortencioflix.tv.data.Text
 import org.junit.Assert.assertEquals
@@ -29,7 +31,6 @@ class ChannelNameTest {
     private fun ch(name: String, group: String) = com.hortencioflix.tv.data.Channel(name, "", "http://x/$name", group)
 
     @Test fun contentType() {
-        val K = com.hortencioflix.tv.data.ChannelFacets.Kind
         fun k(name: String, group: String = "") = com.hortencioflix.tv.data.ChannelFacets.kind(ch(name, group))
         assertEquals(K.SPORT, k("SPORT TV 1", "|PT| DESPORTO"))
         assertEquals(K.SPORT, k("Fox Sports 2"))
@@ -48,7 +49,7 @@ class ChannelNameTest {
     }
 
     @Test fun regionAndGroupLabel() {
-        val F = com.hortencioflix.tv.data.ChannelFacets
+        val F = ChannelFacets
         assertEquals("PT", F.region(ch("RTP 1", "|PT| INTERNACIONAL")))
         assertEquals("BR", F.region(ch("BR: Globo SP", "Canais")))
         assertEquals("PT", F.region(ch("RTP 1", "PORTUGAL")))
