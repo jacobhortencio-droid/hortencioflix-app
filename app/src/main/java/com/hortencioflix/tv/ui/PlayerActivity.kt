@@ -892,7 +892,19 @@ class PlayerActivity : BaseActivity() {
                     .build()
             })
         }
-        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setMaxVideoSize(Int.MAX_VALUE, qualityCap).build()
+        val tb = p.trackSelectionParameters.buildUpon().setMaxVideoSize(Int.MAX_VALUE, qualityCap)
+        // Áudio e legendas: as predefinições gerais e, por cima, o que foi escolhido neste título
+        val mem = com.hortencioflix.tv.data.TrackMemory.get(Session.meta?.id)
+        tb.setPreferredAudioLanguage((mem?.audio ?: "").ifEmpty { Prefs.audioLang }.ifEmpty { null })
+        val memSub = mem?.sub ?: ""
+        when {
+            memSub == "off" -> tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            memSub == "on" -> tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            memSub.isNotEmpty() -> tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setPreferredTextLanguage(memSub)
+            Prefs.subLang == "off" -> tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            else -> tb.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setPreferredTextLanguage(iso2(Prefs.subLang))
+        }
+        p.trackSelectionParameters = tb.build()
         p.setMediaSource(source(playUrl, s.headers, b.build()), startMs)
         p.prepare()
         p.playWhenReady = true
@@ -1626,6 +1638,7 @@ class PlayerActivity : BaseActivity() {
             labels.add("Desligadas")
             actions.add {
                 p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
+                if (!Session.live) com.hortencioflix.tv.data.TrackMemory.setSub(Session.meta?.id, "off")
             }
         }
         for (g in p.currentTracks.groups) {
@@ -1651,6 +1664,12 @@ class PlayerActivity : BaseActivity() {
                         .setOverrideForType(TrackSelectionOverride(group, j))
                         .build()
                     if (type == C.TRACK_TYPE_AUDIO && !lng.isNullOrEmpty()) Prefs.audioLang = lng
+                    // fica guardado para este título: os próximos episódios abrem igual
+                    if (!Session.live) {
+                        val id = Session.meta?.id
+                        if (type == C.TRACK_TYPE_AUDIO && !lng.isNullOrEmpty()) com.hortencioflix.tv.data.TrackMemory.setAudio(id, lng)
+                        if (type == C.TRACK_TYPE_TEXT) com.hortencioflix.tv.data.TrackMemory.setSub(id, if (lng.isNullOrEmpty() || lng == "und") "on" else lng)
+                    }
                 }
             }
         }

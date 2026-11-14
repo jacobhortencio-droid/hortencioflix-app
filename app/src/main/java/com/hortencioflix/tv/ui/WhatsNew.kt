@@ -7,6 +7,8 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "🎧 Áudio e legendas ficam guardados por título: escolhe uma vez (ex.: japonês com legendas, ou legendas desligadas) e os episódios seguintes abrem igual",
+        "Roku 0.22.2: as contas Xtream carregam pela conta (como no telemóvel) mesmo quando o fornecedor bloqueia o ficheiro da lista; a sincronização passa-lhe a identificação que o servidor aceitou aqui",
         "✨ Definições redesenhadas: cartão com o estado de tudo (Stremio, TorBox, Trakt, Roku, nuvem, Internet), categorias com ícones, interruptores a sério e procura que filtra enquanto escreves",
         "Barra de navegação sempre presente no telemóvel — Início, Pesquisa, TV ao vivo, Biblioteca e Definições à distância de um toque, em todos os ecrãs",
         "📺 Canais mais limpos: o nome sem «FHD», «HEVC» ou «|PT|» colados (a qualidade passa para etiquetas), o programa que está a dar com barra de progresso e uma ★ para marcar favoritos com um toque",

@@ -223,7 +223,8 @@ sub onParsed(res as object)
     if not res.ok
         m.groups = []
         renderGroups(0)
-        m.status.text = strOr(res.error)
+        ' a versão ajuda a perceber se a TV já tem a atualização que corrige o problema
+        m.status.text = strOr(res.error) + Chr(10) + Chr(10) + "(Hortêncioflix Roku " + appVersion() + ")"
         focusOn(m.groupsList)
         return
     end if

@@ -310,6 +310,23 @@ function handleSync(method as string, path as string, query as string, buf as st
         end if
         co = d.prefs.curatorOn
         if co <> invalid and (co = "0" or co = "1") then cfgWrite("curatorOn", co)
+        ' identificação (User-Agent) que cada servidor IPTV aceitou no telemóvel
+        iu = d.prefs.iptvUa
+        if iu <> invalid and type(iu) = "roArray"
+            sec = CreateObject("roRegistrySection", "streambox")
+            n = 0
+            for each e in iu
+                if e <> invalid and type(e) = "roAssociativeArray" and n < 8
+                    h = sv(e.h)
+                    ua = sv(e.ua)
+                    if h <> "" and Len(h) <= 80 and ua <> "" and Len(ua) <= 140
+                        sec.Write("iptvUa_" + LCase(h), ua)
+                        n = n + 1
+                    end if
+                end if
+            end for
+            if n > 0 then sec.Flush()
+        end if
     end if
     if d.addons <> invalid and type(d.addons) = "roArray"
         ' a Roku só tem ~16 KB de registo: links de add-on muito compridos ficam de fora

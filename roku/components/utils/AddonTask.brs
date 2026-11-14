@@ -820,12 +820,14 @@ function fixIptvUrl(url as string) as string
 end function
 
 function loadM3u(url as string) as object
+    apiErr = ""
     ' Conta Xtream (link get.php): pela API, só os canais ao vivo — o «m3u_plus» traz milhares de filmes e séries
     ' (dezenas de MB) e a Roku não o consegue carregar
     lu = LCase(url)
     if Instr(1, lu, "get.php") > 0 and Instr(1, lu, "username=") > 0
         xr = loadXtreamLive(url)
         if xr.ok or xr.fatal = true then return xr
+        apiErr = sOr(xr.error)
     end if
     ' alguns servidores IPTV recusam programas que não conhecem: tenta com a identificação de outros leitores
     r = invalid
@@ -846,7 +848,11 @@ function loadM3u(url as string) as object
         end if
         r = invalid
     end for
-    if r = invalid then return { ok: false, url: url, error: lastErr }
+    if r = invalid
+        ' conta Xtream: mostra o que falhou pela API e pelo ficheiro (são dois caminhos diferentes)
+        if apiErr <> "" and apiErr <> lastErr then lastErr = "Pela conta: " + apiErr + Chr(10) + "Pelo ficheiro M3U: " + lastErr
+        return { ok: false, url: url, error: lastErr }
+    end if
     iptvUaRemember(url, usedUa)
     body = r.body
     epgUrl = ""
@@ -1998,7 +2004,7 @@ function iptvUaList(url as string) as object
     sec = CreateObject("roRegistrySection", "streambox")
     k = "iptvUa_" + iptvHost(url)
     if sec.Exists(k) then out.Push(sec.Read(k))
-    for each ua in ["Hortencioflix/0.4 (Roku)", "VLC/3.0.20 LibVLC/3.0.20", "IPTVSmartersPlayer", "okhttp/4.12.0"]
+    for each ua in ["Hortencioflix/0.4 (Roku)", "Hortencioflix-Android/1.0", "VLC/3.0.20 LibVLC/3.0.20", "IPTVSmartersPlayer", "okhttp/4.12.0"]
         dup = false
         for each x in out
             if x = ua then dup = true
@@ -2025,6 +2031,8 @@ function iptvHttpErr(code as integer) as string
     if code = 404 then return "A lista não existe nesse endereço (HTTP 404)."
     if code >= 500 then return "O servidor da lista está com problemas (HTTP " + code.ToStr() + ")."
     if code <= 0 then return "O servidor não respondeu (endereço/porta errados ou servidor em baixo)."
+    ' códigos fora do normal (ex.: 884, 456): é o painel do fornecedor a recusar o pedido
+    if code >= 400 then return "O servidor recusou o pedido (HTTP " + code.ToStr() + "): o fornecedor bloqueia esta forma de pedir a lista."
     return "O servidor respondeu HTTP " + code.ToStr() + "."
 end function
 
@@ -2099,20 +2107,57 @@ function loadXtreamLive(url as string) as object
                     if not hasM then ext = sOr(ui.allowed_output_formats[0])
                 end if
                 cats = {}
+                catIds = []
                 rc = httpGetUA(base + "&action=get_live_categories", ua, 30000)
                 if rc.ok
                     ca = ParseJson(rc.body)
                     if ca <> invalid and type(ca) = "roArray"
                         for each c in ca
-                            if c <> invalid then cats[axStr(c.category_id)] = sOr(c.category_name)
+                            if c <> invalid
+                                cid = axStr(c.category_id)
+                                if cid <> ""
+                                    cats[cid] = sOr(c.category_name)
+                                    catIds.Push(cid)
+                                end if
+                            end if
                         end for
                     end if
                 end if
-                rs = httpGetUA(base + "&action=get_live_streams", ua, 60000)
-                if not rs.ok then return { ok: false, fatal: false, url: url, error: "A conta está ativa mas o servidor não enviou os canais." }
-                arr = ParseJson(rs.body)
+                rc = invalid
+                arr = invalid
+                why = ""
+                rs = httpGetUA(base + "&action=get_live_streams", ua, 90000)
+                if rs.ok
+                    arr = ParseJson(rs.body)
+                    if arr = invalid or type(arr) <> "roArray" then why = "A lista de canais do servidor veio inválida ou grande demais."
+                else
+                    why = "A conta está ativa mas o servidor não enviou os canais (" + iptvHttpErr(rs.code) + ")"
+                end if
                 rs = invalid
-                if arr = invalid or type(arr) <> "roArray" then return { ok: false, fatal: false, url: url, error: "A lista de canais do servidor veio inválida." }
+                if arr = invalid or type(arr) <> "roArray" or arr.Count() = 0
+                    ' lista inteira falhou (muito grande ou recusada): pede categoria a categoria
+                    arr = []
+                    tried = 0
+                    misses = 0
+                    for each cid in catIds
+                        rp = httpGetUA(base + "&action=get_live_streams&category_id=" + esc.Escape(cid), ua, 25000)
+                        part = invalid
+                        if rp.ok then part = ParseJson(rp.body)
+                        rp = invalid
+                        if part <> invalid and type(part) = "roArray"
+                            arr.Append(part)
+                        else
+                            misses = misses + 1
+                        end if
+                        tried = tried + 1
+                        ' servidor que recusa tudo: não insiste nas centenas de categorias
+                        if (tried >= 4 and misses = tried) or arr.Count() >= 15000 or tried >= 400 then exit for
+                    end for
+                    if arr.Count() = 0
+                        if why = "" then why = "A conta está ativa mas não tem canais ao vivo."
+                        return { ok: false, fatal: false, url: url, error: why }
+                    end if
+                end if
                 groups = {}
                 order = []
                 total = 0

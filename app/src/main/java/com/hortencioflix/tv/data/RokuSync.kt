@@ -75,6 +75,15 @@ object RokuSync {
                 val logo = f.optString("l")
                 rokuFavs.put(JSONObject().put("n", f.optString("n")).put("u", f.optString("u")).put("l", if (logo.length > 110) "" else logo))
             }
+            // Identificação (User-Agent) que cada servidor IPTV aceitou aqui: a Roku tenta primeiro essa
+            val iptvUa = JSONArray()
+            val seenHosts = HashSet<String>()
+            for (i in 0 until lists.length()) {
+                val u = lists.optJSONObject(i)?.optString("u") ?: continue
+                val h = u.substringAfter("://", "").substringBefore('/').lowercase()
+                if (h.isEmpty() || !seenHosts.add(h) || iptvUa.length() >= 8) continue
+                iptvUa.put(JSONObject().put("h", h).put("ua", IptvLoader.uaFor(u)))
+            }
             val body = JSONObject()
                 .put("progress", rokuProgress)
                 .put("watched", SyncMerge.idsToRoku(ids.filter { it.count { c -> c == ':' } == 2 }.takeLast(2000)))
@@ -90,7 +99,8 @@ object RokuSync {
                     .put("curatorUrl", Prefs.str("curatorUrl"))
                     .put("curatorOn", Prefs.str("curatorOn", "1"))
                     .put("tmdbKey", Prefs.str("tmdbKey"))
-                    .put("cloudSyncId", if (CloudSync.enabled()) CloudSync.id() else ""))
+                    .put("cloudSyncId", if (CloudSync.enabled()) CloudSync.id() else "")
+                    .put("iptvUa", iptvUa))
             val ok = try {
                 lan.newCall(Request.Builder().url("$base/sync?k=$k")
                     .post(SyncMerge.asciiJson(body).toRequestBody("application/json".toMediaType())).build())
