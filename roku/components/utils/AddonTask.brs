@@ -838,7 +838,7 @@ function loadM3u(url as string) as object
             exit for
         end if
         if r.ok
-            b = LTrim(Left(r.body, 200))
+            b = Left(r.body, 200).Trim()
             if Left(b, 1) = "<" then lastErr = "O link abre uma página web, não uma lista M3U (bloqueado ou link errado)." else lastErr = "O ficheiro não parece ser uma lista M3U (ou está vazio)."
         else
             lastErr = iptvHttpErr(r.code)
@@ -2076,7 +2076,7 @@ function loadXtreamLive(url as string) as object
         else
             d = ParseJson(r.body)
             if d = invalid or type(d) <> "roAssociativeArray" or d.user_info = invalid
-                if Left(LTrim(r.body), 1) = "<" then lastErr = "O servidor respondeu com uma página web em vez da conta (bloqueado?)." else lastErr = "Resposta inesperada do servidor."
+                if Left(Left(r.body, 200).Trim(), 1) = "<" then lastErr = "O servidor respondeu com uma página web em vez da conta (bloqueado?)." else lastErr = "Resposta inesperada do servidor."
             else
                 ui = d.user_info
                 if axStr(ui.auth) = "0" then return { ok: false, fatal: true, url: url, error: "Utilizador ou palavra-passe errados." }
