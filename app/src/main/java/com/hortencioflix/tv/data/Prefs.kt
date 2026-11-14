@@ -345,7 +345,7 @@ object Prefs {
         val out = JSONArray()
         out.put(JSONObject().apply {
             put("m", metaId); put("v", videoId); put("t", posSec); put("d", durSec)
-            put("n", name); put("p", poster); put("y", type); put("a", System.currentTimeMillis() / 1000)
+            put("n", name.takeIf { it != "null" }.orEmpty()); put("p", poster.takeIf { it != "null" }.orEmpty()); put("y", type); put("a", System.currentTimeMillis() / 1000)
         })
         val old = progressList()
         for (i in 0 until old.length()) {

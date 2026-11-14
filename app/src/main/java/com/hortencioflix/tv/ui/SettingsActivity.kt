@@ -25,7 +25,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SettingsActivity : BaseActivity() {
-    private lateinit var adapter: RowAdapter
+    private lateinit var adapter: SettingsAdapter
+    private lateinit var listView: RecyclerView
+    /** Categoria aberta ("" = página principal das Definições). */
+    private var section = ""
+    private var searchJob: Job? = null
     private var linkJob: Job? = null
     private var pendingExport = ""
 
@@ -70,9 +74,28 @@ class SettingsActivity : BaseActivity() {
             if (!isFinishing) refresh()
         }
         val list = findViewById<RecyclerView>(R.id.list)
-        adapter = RowAdapter(emptyList(), onClick = { _, r -> handle(r.tag as String) })
-        list.layoutManager = LinearLayoutManager(this)
+        listView = list
+        section = savedInstanceState?.getString("section") ?: ""
+        adapter = SettingsAdapter(onHero = { heroAction(it) }, onCat = { openSection(it) }, onItem = { handle(it) })
+        // ao deitado/TV as categorias ficam em duas colunas; as opções ocupam a largura toda
+        val wide = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val glm = androidx.recyclerview.widget.GridLayoutManager(this, if (wide) 2 else 1)
+        glm.spanSizeLookup = object : androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int) = if (wide && !adapter.isWide(position)) 1 else glm.spanCount
+        }
+        list.layoutManager = glm
         list.adapter = adapter
+        findViewById<android.view.View>(R.id.settings_back).setOnClickListener { openSection("") }
+        val searchBox = findViewById<android.widget.EditText>(R.id.settings_search)
+        searchBox.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(e: android.text.Editable?) {
+                searchJob?.cancel()
+                searchJob = lifecycleScope.launch { delay(180); filterQ = e?.toString()?.trim() ?: ""; refresh() }
+            }
+        })
+        MobileNav.attach(this, "settings")
         if (resources.configuration.smallestScreenWidthDp >= 600) {
             // Tablet: lista centrada com largura máxima, em vez de esticada de ponta a ponta.
             val side = maxOf(0, (resources.displayMetrics.widthPixels - dp(720)) / 2)
@@ -81,7 +104,158 @@ class SettingsActivity : BaseActivity() {
         }
         refresh()
         list.animateIn()
-        list.post { list.getChildAt(0)?.requestFocus() }
+        if (MobileNav.isTv(this)) list.post { list.getChildAt(0)?.requestFocus() }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("section", section)
+    }
+
+    // Voltar às Definições pela barra de navegação: o PIN é pedido outra vez e abre na página principal
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        if (Prefs.pin.isNotEmpty()) askPin()
+        if (section.isNotEmpty()) openSection("")
+    }
+
+    private fun openSection(key: String) {
+        section = key
+        refresh()
+        listView.scrollToPosition(0)
+        if (MobileNav.isTv(this)) listView.post { listView.getChildAt(0)?.requestFocus() }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        val box = findViewById<android.widget.EditText>(R.id.settings_search)
+        if (box.text.isNotEmpty()) { box.setText(""); return }
+        if (section.isNotEmpty()) { openSection(""); return }
+        if (MobileNav.back(this)) return
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
+    }
+
+    /** Toques no cartão do topo: perfil, estado das contas e ações rápidas. */
+    private fun heroAction(key: String) {
+        when (key) {
+            "profile" -> Profiles.pick(this)
+            "roku" -> openSection("Roku e sincronização")
+            "net" -> handle("diag")
+            "syncAll" -> {
+                toast("A sincronizar…")
+                lifecycleScope.launch {
+                    val msg = withContext(Dispatchers.IO) {
+                        val parts = ArrayList<String>()
+                        if (com.hortencioflix.tv.data.CloudSync.enabled()) parts.add("Nuvem: " + com.hortencioflix.tv.data.CloudSync.sync(force = true))
+                        if (com.hortencioflix.tv.data.RokuSync.configured) parts.add("Roku: " + com.hortencioflix.tv.data.RokuSync.sync().message)
+                        if (Stremio.loggedIn) { try { com.hortencioflix.tv.data.HomeData.syncIfNeeded(true); parts.add("Stremio: sincronizado") } catch (e: Exception) {} }
+                        parts.joinToString("\n").ifEmpty { "Nada para sincronizar: liga a conta Stremio, a Roku ou a nuvem." }
+                    }
+                    if (!isFinishing) { toast(msg); refresh() }
+                }
+            }
+            else -> handle(key)
+        }
+    }
+
+    private val sectionOrder = listOf(
+        "Perfil e aparência" to R.drawable.ic_contrast,
+        "Contas e serviços" to R.drawable.ic_person,
+        "Conteúdo" to R.drawable.ic_extension,
+        "Fontes e qualidade" to R.drawable.ic_tune,
+        "Leitor" to R.drawable.ic_play,
+        "Legendas" to R.drawable.ic_subtitles,
+        "TV ao vivo" to R.drawable.ic_live,
+        "Roku e sincronização" to R.drawable.ic_cast,
+        "Segurança e dados" to R.drawable.ic_lock,
+        "Armazenamento" to R.drawable.ic_storage,
+        "Atualizações" to R.drawable.ic_sync,
+        "Sobre" to R.drawable.ic_info
+    )
+
+    private val sourceTags = setOf("quality", "cached", "rangePref", "pinFilters", "animDub", "dubPref", "risky", "qualAuto", "curator", "dataSaver", "ptMeta")
+
+    /** Categoria onde cada opção aparece (algumas listas antigas eram longas demais e foram divididas). */
+    private fun sectionOf(header: String, tag: String): String = when {
+        header == "Reprodução" -> if (tag in sourceTags) "Fontes e qualidade" else "Leitor"
+        header == "Atualizações" && (tag.startsWith("roku") || tag == "cloudSync") -> "Roku e sincronização"
+        header == "Conta" -> "Contas e serviços"
+        else -> header
+    }
+
+    private fun toItem(r: Row, sec: String, showSection: Boolean): SItem {
+        // «Ligado — explicação» / «Desligado — explicação» passam a interruptor + explicação
+        val on = r.subtitle.startsWith("Ligado")
+        val off = r.subtitle.startsWith("Desligado")
+        // (as que abrem um menu em vez de alternar ficam com o texto)
+        val sw = if (r.tag in setOf("curator", "cloudSync", "ptMeta")) null else if (on) true else if (off) false else null
+        val desc = if (sw != null) r.subtitle.substringAfter(" — ", "") else r.subtitle
+        return SItem(r.tag as String, r.title, desc, sw, if (showSection) sec else "")
+    }
+
+    private fun heroEntry(): SHero {
+        val pr = Prefs.currentProfile()
+        val n = Prefs.profiles().size
+        val pills = ArrayList<SPill>()
+        pills.add(SPill("stremio", if (Stremio.loggedIn) "Stremio" else "Stremio · ligar", if (Stremio.loggedIn) 1 else 0))
+        val tb = com.hortencioflix.tv.data.TorboxApi.cached()
+        pills.add(when {
+            Prefs.torboxKey.isEmpty() -> SPill("torbox", "TorBox · sem chave", 0)
+            tb == null || !tb.reachable -> SPill("torbox", "TorBox", 1)
+            tb.invalidKey || tb.expired || tb.free -> SPill("torbox", "TorBox · renovar", 2)
+            tb.daysLeft in 0..5 -> SPill("torbox", "TorBox · " + com.hortencioflix.tv.data.Text.plural(tb.daysLeft.toInt(), "dia", "dias"), 2)
+            tb.daysLeft > 5 -> SPill("torbox", "TorBox · " + com.hortencioflix.tv.data.Text.plural(tb.daysLeft.toInt(), "dia", "dias"), 1)
+            else -> SPill("torbox", "TorBox", 1)
+        })
+        pills.add(SPill("trakt", "Trakt", if (com.hortencioflix.tv.data.Trakt.linked) 1 else 0))
+        pills.add(SPill("roku", "Roku", if (com.hortencioflix.tv.data.RokuSync.configured) 1 else 0))
+        if (Prefs.str("curatorUrl").isNotEmpty()) pills.add(SPill("cloudSync", "Nuvem", if (com.hortencioflix.tv.data.CloudSync.enabled()) 1 else 0))
+        if (com.hortencioflix.tv.data.NetSpeed.kbps() > 0) pills.add(SPill("net", com.hortencioflix.tv.data.NetSpeed.mbpsText(), 1))
+        val sub = (if (pr.kids) "Perfil infantil" else "Perfil ativo") + " · " + com.hortencioflix.tv.data.Text.plural(n, "perfil", "perfis") + " · versão ${BuildConfig.VERSION_NAME}"
+        return SHero(pr.name, sub, pills, listOf("syncAll" to "Sincronizar tudo", "update" to "Atualizações", "diag" to "Diagnóstico", "backup" to "Cópia de segurança"))
+    }
+
+    /** Desenha a página: principal (cartão + categorias), uma categoria, ou os resultados da pesquisa. */
+    private fun render(rows: List<Row>) {
+        // agrupa as opções pela categoria final
+        val bySection = LinkedHashMap<String, ArrayList<Row>>()
+        var header = ""
+        for (r in rows) {
+            if (r.tag === Header) { header = r.title; continue }
+            val tag = r.tag as? String ?: continue
+            bySection.getOrPut(sectionOf(header, tag)) { ArrayList() }.add(r)
+        }
+        val title = findViewById<TextView>(R.id.settings_title)
+        val back = findViewById<android.view.View>(R.id.settings_back)
+        val out = ArrayList<SEntry>()
+        if (filterQ.isNotEmpty()) {
+            val fq = com.hortencioflix.tv.data.Epg.norm(filterQ)
+            for ((sec, list) in bySection) for (r in list) {
+                if (com.hortencioflix.tv.data.Epg.norm(r.title + " " + r.subtitle + " " + sec).contains(fq)) out.add(toItem(r, sec, true))
+            }
+            title.text = "Definições"
+            back.visibility = android.view.View.GONE
+            if (out.isEmpty()) out.add(SLabel("Nada encontrado para «$filterQ» — tenta outra palavra"))
+            else out.add(0, SLabel(com.hortencioflix.tv.data.Text.plural(out.size, "resultado", "resultados")))
+        } else if (section.isNotEmpty() && bySection.containsKey(section)) {
+            title.text = section
+            back.visibility = android.view.View.VISIBLE
+            for (r in bySection.getValue(section)) out.add(toItem(r, section, false))
+        } else {
+            section = ""
+            title.text = "Definições"
+            back.visibility = android.view.View.GONE
+            out.add(heroEntry())
+            for ((name, icon) in sectionOrder) {
+                val list = bySection[name] ?: continue
+                val summary = list.take(3).joinToString(" · ") { it.title.substringBefore(":") } + if (list.size > 3) " …" else ""
+                out.add(SCat(name, icon, name, summary))
+            }
+            // categorias novas que ainda não tenham ícone próprio
+            for ((name, list) in bySection) if (sectionOrder.none { it.first == name }) out.add(SCat(name, R.drawable.ic_settings, name, list.take(3).joinToString(" · ") { it.title }))
+        }
+        adapter.submitList(out)
     }
 
     private fun curatorMenu() {
@@ -288,11 +462,10 @@ class SettingsActivity : BaseActivity() {
 
     private fun refresh() {
         val rows = ArrayList<Row>()
-        rows.add(Row(if (filterQ.isEmpty()) "🔍  Procurar nas definições" else "🔍  «$filterQ» — toca para alterar ou limpar", "", tag = "find"))
         rows.add(header("Perfil e aparência"))
         val pr = Prefs.currentProfile()
-        rows.add(Row("Perfil: ${pr.name}" + if (pr.kids) " (infantil)" else "", "${Prefs.profiles().size} perfil(is) — cada um tem o seu progresso, vistos e favoritos", tag = "profile"))
-        rows.add(Row("Organizar o Início", com.hortencioflix.tv.data.HomeLayout.hidden().size.let { if (it == 0) "Escolhe que filas aparecem e qual vem primeiro" else "$it fila(s) escondida(s)" }, tag = "homeLayout"))
+        rows.add(Row("Perfil: ${pr.name}" + if (pr.kids) " (infantil)" else "", com.hortencioflix.tv.data.Text.plural(Prefs.profiles().size, "perfil", "perfis") + " — cada um tem o seu progresso, vistos e favoritos", tag = "profile"))
+        rows.add(Row("Organizar o Início", com.hortencioflix.tv.data.HomeLayout.hidden().size.let { if (it == 0) "Escolhe que filas aparecem e qual vem primeiro" else com.hortencioflix.tv.data.Text.plural(it, "fila escondida", "filas escondidas") }, tag = "homeLayout"))
         rows.add(Row("Tema", when (Prefs.themeMode) {
             "amoled" -> "AMOLED — preto puro (poupa bateria em ecrãs OLED)"
             "light" -> "Claro"
@@ -303,9 +476,9 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Tamanho dos posters", listOf("Pequeno", "Normal", "Grande")[Prefs.posterSize], tag = "posterSize"))
 
         rows.add(header("Conta"))
-        rows.add(Row("Conta Stremio", if (Stremio.loggedIn) "Ligada: ${Prefs.stremioEmail.ifEmpty { "conta Stremio" }} — add-ons e biblioteca sincronizados" else "Não ligada — liga para importar os teus add-ons, biblioteca e progresso", tag = "stremio"))
+        rows.add(Row("Conta Stremio", if (Stremio.loggedIn) "Ligada: ${com.hortencioflix.tv.data.Text.maskEmail(Prefs.stremioEmail).ifEmpty { "conta Stremio" }} — add-ons e biblioteca sincronizados" else "Não ligada — liga para importar os teus add-ons, biblioteca e progresso", tag = "stremio"))
         if (Stremio.loggedIn) rows.add(Row("Sincronizar agora", "Atualiza add-ons, biblioteca e «Continuar a ver»", tag = "sync"))
-        rows.add(Row("TorBox", if (Prefs.torboxKey.isNotEmpty()) (com.hortencioflix.tv.data.TorboxApi.cached()?.let { com.hortencioflix.tv.data.TorboxApi.summary(it) } ?: "Chave configurada — Torrentio com TorBox ativo") else "Sem chave — adiciona a tua chave da API TorBox", tag = "torbox"))
+        rows.add(Row("TorBox", if (Prefs.torboxKey.isNotEmpty()) (com.hortencioflix.tv.data.TorboxApi.cached()?.let { com.hortencioflix.tv.data.Text.maskEmails(com.hortencioflix.tv.data.TorboxApi.summary(it)).replace("✅ ", "").replace("❌ ", "Atenção: ") } ?: "Chave configurada — Torrentio com TorBox ativo") else "Sem chave — adiciona a tua chave da API TorBox", tag = "torbox"))
         val svcNames = mapOf("torbox" to "TorBox", "realdebrid" to "Real-Debrid", "alldebrid" to "AllDebrid", "premiumize" to "Premiumize", "debridlink" to "Debrid-Link", "offcloud" to "Offcloud")
         rows.add(Row("Serviço de debrid", (svcNames[Prefs.debridService] ?: Prefs.debridService) + (if (Prefs.debridService != "torbox") (if (Prefs.debridKey.isNotEmpty()) " — chave configurada" else " — falta a chave") else " — usa a chave TorBox acima"), tag = "debrid"))
         rows.add(Row("Trakt", if (com.hortencioflix.tv.data.Trakt.linked) "Ligado — progresso, lista para ver e recomendações" else "Não ligado — sincroniza o que vês com o Trakt", tag = "trakt"))
@@ -377,10 +550,7 @@ class SettingsActivity : BaseActivity() {
 
         rows.add(header("Sobre"))
         rows.add(Row("Hortêncioflix", "Versão ${BuildConfig.VERSION_NAME} · ajuda e atalhos", tag = "about"))
-        if (filterQ.isEmpty()) { adapter.update(rows); return }
-        val fq = com.hortencioflix.tv.data.Epg.norm(filterQ)
-        val hits = rows.filter { it.tag != Header && it.tag != "find" && com.hortencioflix.tv.data.Epg.norm(it.title + " " + it.subtitle).contains(fq) }
-        adapter.update(listOf(rows.first()) + hits.ifEmpty { listOf(Row("Nada encontrado", "Tenta outra palavra", tag = "find")) })
+        render(rows)
     }
 
     private fun handle(key: String) {
@@ -393,7 +563,6 @@ class SettingsActivity : BaseActivity() {
             "diag" -> startActivity(android.content.Intent(this, DiagnosticsActivity::class.java))
             "backup" -> backup()
             "pin" -> pinMenu()
-            "find" -> inputDialog("Procurar nas definições", "ex.: legendas, PIN, TorBox", filterQ) { filterQ = it.trim(); refresh() }
             "profile" -> Profiles.pick(this)
             "theme" -> choiceDialog("Tema", listOf("Escuro (padrão)", "AMOLED (preto puro)", "Claro", "Vidro (liquid glass)").mapIndexed { i, n ->
                 (if (listOf("dark", "amoled", "light", "glass")[i] == Prefs.themeMode) "● " else "") + n }) {

@@ -30,7 +30,12 @@ class IptvActivity : BaseActivity() {
     private var groups: List<ChannelGroup> = emptyList()
     private var shown: List<Channel> = emptyList()
     private lateinit var groupAdapter: RowAdapter
-    private lateinit var channelAdapter: RowAdapter
+    private lateinit var channelAdapter: ChannelAdapter
+    private var touch = false
+    /** Todos os canais da lista aberta e os nomes já normalizados para a pesquisa (calculados uma vez). */
+    private var allChannels: List<Channel> = emptyList()
+    private var normNames: List<String> = emptyList()
+    private var mixedGroup = true
     private lateinit var listName: TextView
     private lateinit var status: TextView
     private lateinit var channelsView: RecyclerView
@@ -60,7 +65,8 @@ class IptvActivity : BaseActivity() {
         groupsView.layoutManager = if (portrait) LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false) else LinearLayoutManager(this)
         groupsView.adapter = groupAdapter
 
-        channelAdapter = RowAdapter(emptyList(), onClick = { i, _ ->
+        touch = !MobileNav.isTv(this)
+        channelAdapter = ChannelAdapter(touch, onClick = { i, _ ->
             val ch = shown.getOrNull(i)
             if (ch != null && IptvVod.isVod(ch)) {
                 IptvVod.open(this, ch) { b -> loader.visibility = if (b) View.VISIBLE else View.GONE; if (b) status.text = "A procurar legendas…" }
@@ -68,15 +74,18 @@ class IptvActivity : BaseActivity() {
                 Session.live(shown, i)
                 PlayerActivity.start(this)
             }
-        }, onLong = { _, r ->
-            val ch = r.tag as Channel
-            if (showingFavs) favMenu(ch) else {
-                val on = Prefs.toggleFavorite(ch)
-                toast(if (on) "★ ${ch.name} adicionado aos favoritos" else "${ch.name} removido dos favoritos")
-            }
-        })
+        }, onLong = { ch -> if (showingFavs) favMenu(ch) else toggleFav(ch) }, onFav = { ch -> toggleFav(ch) })
+        channelAdapter.favorites = Prefs.favoriteChannels().map { it.url }.toSet()
         channelsView.layoutManager = LinearLayoutManager(this)
         channelsView.adapter = channelAdapter
+        channelsView.itemAnimator = null
+        channelsView.setHasFixedSize(true)
+        // «A dar agora» das contas Xtream: pede só para os canais que ficam no ecrã quando a lista pára
+        channelsView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) requestNowForVisible()
+            }
+        })
 
         search = findViewById(R.id.search)
         retry = findViewById(R.id.btn_retry)
@@ -100,6 +109,7 @@ class IptvActivity : BaseActivity() {
             else EpgGridActivity.start(this, shown)
         }
 
+        MobileNav.attach(this, "live")
         val last = Prefs.str("iptvLast")
         if (last.isNotEmpty()) {
             loadList(Prefs.str("iptvLastName", "Lista"), last)
@@ -113,8 +123,38 @@ class IptvActivity : BaseActivity() {
         }
     }
 
+    private fun toggleFav(ch: Channel) {
+        val on = Prefs.toggleFavorite(ch)
+        channelAdapter.favorites = Prefs.favoriteChannels().map { it.url }.toSet()
+        channelAdapter.refresh(ch.url, channelsView)
+        val name = com.hortencioflix.tv.data.ChannelName.of(ch.name).name
+        status.text = if (on) "★ $name adicionado aos favoritos" else "$name removido dos favoritos"
+        if (showingFavs && !on) showFavorites()
+    }
+
+    private fun requestNowForVisible() {
+        val lm = channelsView.layoutManager as? LinearLayoutManager ?: return
+        val a = lm.findFirstVisibleItemPosition()
+        val b = lm.findLastVisibleItemPosition()
+        if (a < 0) return
+        for (i in a..b) {
+            val ch = shown.getOrNull(i) ?: continue
+            if (!com.hortencioflix.tv.data.XtreamNow.supports(ch.url) || Epg.nowNext(ch).first != null) continue
+            com.hortencioflix.tv.data.XtreamNow.request(ch.url) { if (!isFinishing) channelAdapter.refresh(ch.url, channelsView) }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (::search.isInitialized && search.text.isNotEmpty()) { search.setText(""); return }
+        if (MobileNav.back(this)) return
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
+    }
+
     private fun showGroup(i: Int) {
         val g = groups.getOrNull(i) ?: return
+        mixedGroup = g.title == "Todos" || g.title.startsWith("🕘") || g.title == "Favoritos"
         if (currentGroup === g.channels && search.text.isEmpty()) return
         currentGroup = g.channels
         if (search.text.isNotEmpty()) { applyFilter(); return }
@@ -126,21 +166,24 @@ class IptvActivity : BaseActivity() {
         val list = if (Prefs.hideDead) input.filter { it.url !in dead } else input
         shown = list
         if (list.isEmpty() && groups.isNotEmpty() && loader.visibility != View.VISIBLE) status.text = if (search.text.isNotEmpty()) "Nenhum canal com esse nome." else "Este grupo não tem canais (ou estão todos marcados como offline)."
-        channelAdapter.update(list.take(3000).map { ch ->
-            val epg = Epg.describe(ch)
-            val off = if (ch.url in dead) "✗ offline  ·  " else ""
-            Row(ch.name, off + epg.ifEmpty { ch.group }, ch.logo.ifEmpty { "#" }, ch)
-        })
+        channelAdapter.dead = dead
+        channelAdapter.showGroup = mixedGroup || search.text.isNotEmpty()
+        channelAdapter.submit(list)
         channelsView.scrollToPosition(0)
+        channelsView.post { requestNowForVisible() }
     }
 
     /** Procura por nome em todos os canais da lista (ignora acentos e maiúsculas). */
     private fun applyFilter() {
         val q = Epg.norm(search.text.toString())
         if (q.isEmpty()) { showChannels(currentGroup); return }
-        val all = groups.flatMap { it.channels }.distinctBy { it.url }
-        val found = all.filter { Epg.norm(it.name).contains(q) }
-        status.text = "${found.size} canais encontrados"
+        // nomes normalizados uma só vez por lista: procurar em 20 000 canais é imediato
+        val names = normNames
+        val all = allChannels
+        val found = ArrayList<Channel>()
+        if (names.size == all.size) { for (i in all.indices) if (names[i].contains(q)) found.add(all[i]) }
+        else for (c in all) if (Epg.norm(c.name).contains(q)) found.add(c)
+        status.text = com.hortencioflix.tv.data.Text.plural(found.size, "canal encontrado", "canais encontrados")
         showChannels(found)
     }
 
@@ -150,8 +193,9 @@ class IptvActivity : BaseActivity() {
         lifecycleScope.launch {
             val ok = withContext(Dispatchers.IO) { Epg.load(epgUrl) }
             if (ok && lastUrl == url) {
-                showChannels(shown)
-                toast("Guia de programação carregado")
+                // redesenha só as linhas visíveis, sem saltar para o topo nem tapar a lista com um aviso
+                channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount, "now")
+                if (status.text.isNotEmpty() && !status.text.contains("guia")) status.text = "${status.text}  ·  guia carregado"
             }
         }
     }
@@ -164,7 +208,27 @@ class IptvActivity : BaseActivity() {
             .map { g -> if (locked && g.title == "Todos") ChannelGroup(g.title, g.channels.filter { !adultRe.containsMatchIn(it.group) }) else g }
         val list = if (visible.isNotEmpty() && recents.isNotEmpty()) listOf(ChannelGroup("🕘 Recentes", recents)) + visible else visible
         groups = list
-        groupAdapter.update(list.map { Row(if (groupAdapterChip()) "${it.title} (${it.channels.size})" else it.title, "${it.channels.size} canais") })
+        // índice de pesquisa e logótipos genéricos (o mesmo ícone em muitos canais), calculados fora do ecrã
+        val flat = LinkedHashMap<String, Channel>()
+        for (g in visible) for (c in g.channels) flat.putIfAbsent(c.url, c)
+        allChannels = flat.values.toList()
+        normNames = emptyList()
+        val snapshot = allChannels
+        lifecycleScope.launch {
+            val (names, generic) = withContext(Dispatchers.Default) {
+                snapshot.map { Epg.norm(it.name) } to snapshot.groupingBy { it.logo }.eachCount().filter { it.key.isNotEmpty() && it.value >= 8 }.keys
+            }
+            if (allChannels === snapshot) {
+                normNames = names
+                if (generic != channelAdapter.genericLogos) { channelAdapter.genericLogos = generic; channelAdapter.notifyDataSetChanged() }
+            }
+        }
+        groupAdapter.update(list.map {
+            val recent = it.title.startsWith("🕘")
+            val label = if (recent) "Recentes" else it.title
+            val n = com.hortencioflix.tv.data.Text.num(it.channels.size)
+            Row(if (groupAdapterChip()) "$label  $n" else label, com.hortencioflix.tv.data.Text.plural(it.channels.size, "canal", "canais"), icon = if (recent) R.drawable.ic_history else 0)
+        })
         shown = emptyList()
         currentGroup = emptyList()
         if (list.isEmpty()) showChannels(emptyList()) else showGroup(if (recents.isNotEmpty() && visible.isNotEmpty()) 1 else 0)
@@ -227,11 +291,11 @@ class IptvActivity : BaseActivity() {
         val favs = Prefs.favoriteChannels()
         listName.text = "★ Favoritos"
         if (favs.isEmpty()) {
-            status.text = "Ainda não tens favoritos. Mantém OK premido num canal para o adicionar."
+            status.text = if (touch) "Ainda não tens favoritos. Toca na estrela de um canal para o adicionar." else "Ainda não tens favoritos. Mantém OK premido num canal para o adicionar."
             setGroups(emptyList())
             return
         }
-        status.text = "${favs.size} canais favoritos"
+        status.text = com.hortencioflix.tv.data.Text.plural(favs.size, "canal favorito", "canais favoritos")
         allGroups = emptyList()
         setGroups(listOf(ChannelGroup("Favoritos", favs)))
         channelsView.post { channelsView.getChildAt(0)?.requestFocus() }
@@ -292,7 +356,7 @@ class IptvActivity : BaseActivity() {
                     }
                 }
                 val t = text
-                parsed = netParsed ?: if (t == null) emptyList() else withContext(Dispatchers.Default) { Iptv.parse(t, 20000) }
+                parsed = netParsed ?: if (t == null) emptyList() else withContext(Dispatchers.Default) { Iptv.parse(t, 60000) }
                 if (parsed.isEmpty() && loadErr != null) {
                     status.text = loadErr
                     retry.visibility = View.VISIBLE
@@ -307,7 +371,7 @@ class IptvActivity : BaseActivity() {
             Prefs.put("iptvLast", url)
             Prefs.put("iptvLastName", name)
             val total = parsed.first().channels.size
-            status.text = "$total canais  ·  mantém OK premido para favoritos"
+            status.text = com.hortencioflix.tv.data.Text.plural(total, "canal", "canais") + if (touch) "" else "  ·  mantém OK premido para favoritos"
             allGroups = parsed
             setGroups(parsed)
             findViewById<RecyclerView>(R.id.groups).post { findViewById<RecyclerView>(R.id.groups).getChildAt(0)?.requestFocus() }

@@ -38,11 +38,12 @@ fun Context.themeColor(attr: Int): Int {
 
 /** Linha de filtros: margem final, sem animações de item e desvanecer na margem para mostrar que há mais. */
 fun androidx.recyclerview.widget.RecyclerView.chipStyle() {
+    // Sem «fading edge»: com margem interior, o Android desenhava o esbatimento antes da margem e o último
+    // botão aparecia cortado por um retângulo. O botão meio visível na borda já mostra que há mais.
     clipToPadding = false
-    setPadding(paddingLeft, paddingTop, context.dp(24), paddingBottom)
+    setPadding(paddingLeft, paddingTop, context.dp(16), paddingBottom)
     itemAnimator = null
-    isHorizontalFadingEdgeEnabled = true
-    setFadingEdgeLength(context.dp(28))
+    isHorizontalFadingEdgeEnabled = false
     overScrollMode = android.view.View.OVER_SCROLL_NEVER
 }
 
@@ -166,7 +167,7 @@ fun formatTime(sec: Long): String {
 }
 
 /** Linha genérica para listas (fontes, episódios, canais, definições). */
-data class Row(val title: String, val subtitle: String = "", val image: String = "", val tag: Any? = null)
+data class Row(val title: String, val subtitle: String = "", val image: String = "", val tag: Any? = null, val icon: Int = 0)
 
 /** Marca de cabeçalho de secção numa lista de [Row]. */
 object Header
@@ -224,6 +225,14 @@ class RowAdapter(
         val r = items[position]
         h.title.text = r.title
         if (r.tag === Header) return
+        if (chip) {
+            // ícone vetorial (com a cor do texto) em vez de emoji
+            val d = if (r.icon != 0) androidx.core.content.ContextCompat.getDrawable(h.title.context, r.icon)?.mutate() else null
+            d?.setTint(h.title.currentTextColor)
+            d?.setBounds(0, 0, h.title.context.dp(18), h.title.context.dp(18))
+            h.title.setCompoundDrawablesRelative(d, null, null, null)
+            h.title.compoundDrawablePadding = h.title.context.dp(8)
+        }
         h.subtitle?.let {
             it.text = r.subtitle
             it.visibility = if (r.subtitle.isEmpty()) View.GONE else View.VISIBLE

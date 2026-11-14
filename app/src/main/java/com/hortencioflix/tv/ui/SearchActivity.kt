@@ -97,7 +97,18 @@ class SearchActivity : BaseActivity() {
             render()
         }
         render()
-        query.requestFocus()
+        MobileNav.attach(this, "search")
+        // Na TV o cursor começa na caixa de pesquisa; no telemóvel o teclado só abre quando tocas nela
+        // (antes tapava logo metade das sugestões).
+        if (MobileNav.isTv(this)) query.requestFocus()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (query.text.isNotEmpty()) { query.setText(""); return }
+        if (MobileNav.back(this)) return
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
     }
 
     private fun open(m: MetaItem) {
@@ -144,13 +155,16 @@ class SearchActivity : BaseActivity() {
         if (lastQuery.isEmpty()) {
             status.visibility = View.GONE
             val rec = Prefs.recentSearches()
-            if (rec.isNotEmpty()) { e.add("Pesquisas recentes"); e.add(ChipsRow(rec)) }
+            if (rec.isNotEmpty()) {
+                e.add(HeaderAction("Pesquisas recentes", "Limpar") { Prefs.clearRecentSearches(); render() })
+                e.add(ChipsRow(rec))
+            }
             val pop = popular.filter { pass(it) }
             if (pop.isNotEmpty()) { e.add("Populares agora"); e.addAll(pop) }
         } else {
             val list = results.filter { pass(it) }
             status.visibility = View.VISIBLE
-            status.text = if (list.isEmpty() && progress.visibility != View.VISIBLE) "🔍  Sem resultados para «$lastQuery». Tenta outro título ou outro nome." else "${list.size} resultados para «$lastQuery»"
+            status.text = if (list.isEmpty() && progress.visibility != View.VISIBLE) "Sem resultados para «$lastQuery». Tenta outro título ou o nome original." else "${list.size} resultados para «$lastQuery»"
             e.addAll(list)
         }
         adapter.entries = e

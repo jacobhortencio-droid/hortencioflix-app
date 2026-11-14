@@ -65,8 +65,9 @@ class PosterVH(v: View) : RecyclerView.ViewHolder(v) {
             frame.layoutParams = flp
         }
         val skeleton = m.id.startsWith("sk:")
-        title.text = if (skeleton) "" else m.name
-        fallback.text = if (skeleton) "" else m.name
+        val shownName = m.name.takeIf { it.isNotBlank() && it != "null" } ?: "Sem título"
+        title.text = if (skeleton) "" else shownName
+        fallback.text = if (skeleton) "" else shownName
         val rating = Regex("IMDb (\\d+(?:\\.\\d)?)").find(m.info)?.groupValues?.get(1)
         val q = Regex("\\b(4K|1080p|720p)\\b").find(m.info)?.value
         val b = listOfNotNull(q, rating?.let { "★ $it" }).joinToString(" ")
@@ -101,6 +102,9 @@ class PosterVH(v: View) : RecyclerView.ViewHolder(v) {
 /** Linha de etiquetas (pesquisas recentes) numa grelha. */
 data class ChipsRow(val items: List<String>)
 
+/** Cabeçalho com uma ação à direita (ex.: «Pesquisas recentes» · «Limpar»). */
+class HeaderAction(val title: String, val action: String, val onAction: () -> Unit)
+
 /** Grelha de cartazes com cabeçalhos (String), cartazes (MetaItem) e etiquetas (ChipsRow). */
 class MetaGridAdapter(
     private val cellWidth: () -> Int,
@@ -115,7 +119,7 @@ class MetaGridAdapter(
         override fun getSpanSize(position: Int) = if (entries.getOrNull(position) is MetaItem) 1 else span
     }
 
-    override fun getItemViewType(position: Int) = when (entries[position]) { is String -> 0; is ChipsRow -> 2; else -> 1 }
+    override fun getItemViewType(position: Int) = when (entries[position]) { is String -> 0; is ChipsRow -> 2; is HeaderAction -> 3; else -> 1 }
     override fun getItemCount() = entries.size
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -136,6 +140,30 @@ class MetaGridAdapter(
                 rv.layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
                 object : RecyclerView.ViewHolder(rv) {}
             }
+            3 -> {
+                val row = android.widget.LinearLayout(ctx)
+                row.orientation = android.widget.LinearLayout.HORIZONTAL
+                row.gravity = android.view.Gravity.CENTER_VERTICAL
+                row.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                row.setPadding(ctx.dp(4), ctx.dp(16), 0, ctx.dp(8))
+                val t = TextView(ctx)
+                t.setTextColor(ctx.themeColor(R.attr.hfText))
+                t.textSize = 17f
+                t.typeface = androidx.core.content.res.ResourcesCompat.getFont(ctx, R.font.hf_display)
+                row.addView(t, android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                val act = TextView(ctx)
+                act.setTextColor(ctx.themeColor(R.attr.hfAccent))
+                act.textSize = 13f
+                act.setTypeface(null, android.graphics.Typeface.BOLD)
+                act.setPadding(ctx.dp(12), ctx.dp(6), ctx.dp(8), ctx.dp(6))
+                act.isClickable = true
+                act.isFocusable = true
+                val tv = android.util.TypedValue()
+                ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+                act.setBackgroundResource(tv.resourceId)
+                row.addView(act, android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                object : RecyclerView.ViewHolder(row) {}
+            }
             else -> PosterVH(LayoutInflater.from(ctx).inflate(R.layout.item_poster, parent, false))
         }
     }
@@ -149,6 +177,11 @@ class MetaGridAdapter(
                 tv.textSize = if (big) 26f else 17f
                 tv.typeface = androidx.core.content.res.ResourcesCompat.getFont(tv.context, R.font.hf_display)
                 tv.setPadding(tv.paddingLeft, tv.context.dp(if (big) 24 else 16), 0, tv.context.dp(8))
+            }
+            is HeaderAction -> {
+                val row = holder.itemView as android.widget.LinearLayout
+                (row.getChildAt(0) as TextView).text = e.title
+                (row.getChildAt(1) as TextView).apply { text = e.action; setOnClickListener { e.onAction() } }
             }
             is ChipsRow -> {
                 val rv = holder.itemView as RecyclerView
@@ -361,8 +394,8 @@ class MobileHomeFragment : Fragment() {
                 rv.setPadding(parent.context.dp(16), parent.context.dp(12), 0, 0)
                 rv.chipStyle()
                 rv.layoutManager = LinearLayoutManager(parent.context, LinearLayoutManager.HORIZONTAL, false)
-                val chips = arrayListOf(Row("🧭  Explorar", tag = "movie"), Row("🎬  Filmes", tag = "movie"), Row("📺  Séries", tag = "series"))
-                if (com.hortencioflix.tv.data.Prefs.torboxKey.isNotEmpty()) chips.add(Row("⬇  TorBox", tag = "torbox"))
+                val chips = arrayListOf(Row("Explorar", tag = "movie", icon = R.drawable.ic_explore), Row("Filmes", tag = "movie", icon = R.drawable.ic_movie), Row("Séries", tag = "series", icon = R.drawable.ic_tv))
+                if (com.hortencioflix.tv.data.Prefs.torboxKey.isNotEmpty()) chips.add(Row("TorBox", tag = "torbox", icon = R.drawable.ic_download))
                 rv.adapter = RowAdapter(chips, chip = true, onClick = { _, r ->
                     if (r.tag == "torbox") parent.context.startActivity(Intent(parent.context, TorboxActivity::class.java))
                     else CatalogActivity.explore(parent.context, r.tag as String)
@@ -468,6 +501,10 @@ class MobileHomeFragment : Fragment() {
                     setColor(if (sel) itemView.context.themeColor(R.attr.hfAccent) else 0x88FFFFFF.toInt())
                 }
                 dots.addView(d)
+            }
+            itemView.findViewById<TextView?>(R.id.hero_profile)?.let { av ->
+                av.text = com.hortencioflix.tv.data.Prefs.currentProfile().name.trim().take(1).uppercase().ifEmpty { "P" }
+                av.setOnClickListener { activity?.let { a -> Profiles.pick(a) } }
             }
             title.text = m.name
             info.text = listOf(if (m.type == "series") "Série" else "Filme", m.info).filter { it.isNotEmpty() }.joinToString("   ·   ")

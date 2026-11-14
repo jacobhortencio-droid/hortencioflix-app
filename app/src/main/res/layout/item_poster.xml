@@ -5,6 +5,7 @@
     android:layout_height="wrap_content"
     android:layout_marginStart="4dp"
     android:layout_marginEnd="4dp"
+    android:layout_marginBottom="12dp"
     android:background="?android:attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true"
@@ -64,9 +65,10 @@
         android:id="@+id/poster_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="6dp"
         android:ellipsize="end"
-        android:maxLines="2"
+        android:lines="2"
+        android:lineSpacingExtra="1dp"
         android:textColor="?attr/hfMuted"
         android:textSize="12sp" />
 

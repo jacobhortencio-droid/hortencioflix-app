@@ -97,6 +97,12 @@ assert.equal(r.status, 400);
   assert.equal(st.progress.length, 1);                    // acabado sai da lista
   st = syncMerge(st, { progress: [{ m: "tt2", v: "tt2:1:2", t: 9, a: 2000 }] }, 2001);
   assert.equal(st.progress.length, 2);                    // visto de novo depois: volta
+  // nome «null» vindo de um aparelho: limpo, e completado pelo outro lado mesmo que seja mais antigo
+  let n1 = syncMerge({}, { progress: [{ m: "tt7", v: "tt7:1:1", t: 5, a: 50, n: "null", p: null }] }, 1);
+  assert.equal(n1.progress[0].n, "");
+  n1 = syncMerge(n1, { progress: [{ m: "tt7", v: "tt7:1:1", t: 5, a: 50, n: "VisionQuest", p: "https://x/p.jpg" }] }, 2);
+  assert.equal(n1.progress[0].n, "VisionQuest");
+  assert.equal(n1.progress[0].p, "https://x/p.jpg");
   const env = { SYNC: new Map() };
   env.SYNC.get = async (k) => Map.prototype.get.call(env.SYNC, k);
   env.SYNC.put = async (k, v) => Map.prototype.set.call(env.SYNC, k, v);

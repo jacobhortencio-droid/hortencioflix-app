@@ -8,7 +8,7 @@
 // A configuração vai no próprio endereço (base64url de {"a":[add-ons],"k":"chave TorBox"}),
 // por isso o servidor não guarda nada teu. Nunca escreve a chave em registos.
 
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 const TB = "https://api.torbox.app/v1/api";
 const UA = "Hortencioflix-Curador/" + VERSION;
 const ADDON_TIMEOUT_MS = 8000;
@@ -435,13 +435,19 @@ export function syncMerge(state, inc, now) {
   for (const m of (Array.isArray(inc.hidden) ? inc.hidden : [])) if (typeof m === "string" && m) st.hidden[m] = now;
   // «Continuar a ver»: por título, fica o mais recente
   const best = new Map();
+  // texto limpo: nunca guardar «null»/«undefined» como nome
+  const txt = (v, n) => { const t = v == null ? "" : String(v); return (t === "null" || t === "undefined" ? "" : t).slice(0, n); };
   for (const o of [...st.progress, ...(Array.isArray(inc.progress) ? inc.progress : [])]) {
     if (!o || typeof o.m !== "string" || !o.m) continue;
     const cur = best.get(o.m);
-    if (!cur || (Number(o.a) || 0) > (Number(cur.a) || 0)) best.set(o.m, {
-      m: o.m, v: String(o.v || ""), t: Number(o.t) || 0, d: Number(o.d) || 0, n: String(o.n || "").slice(0, 120),
-      p: String(o.p || "").slice(0, 300), y: String(o.y || ""), a: Number(o.a) || 0,
-    });
+    const e = { m: o.m, v: txt(o.v, 80), t: Number(o.t) || 0, d: Number(o.d) || 0, n: txt(o.n, 120), p: txt(o.p, 300), y: txt(o.y, 12), a: Number(o.a) || 0 };
+    if (!cur) { best.set(o.m, e); continue; }
+    // fica o mais recente; nome, capa e tipo em falta completam-se com os do outro lado
+    const [win, other] = e.a > cur.a ? [e, cur] : [cur, e];
+    if (!win.n) win.n = other.n;
+    if (!win.p) win.p = other.p;
+    if (!win.y) win.y = other.y;
+    best.set(o.m, win);
   }
   // um título acabado/retirado só volta se for visto de novo depois disso
   st.progress = [...best.values()]

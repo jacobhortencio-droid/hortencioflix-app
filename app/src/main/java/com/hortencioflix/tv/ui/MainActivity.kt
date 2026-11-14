@@ -53,8 +53,7 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
+    private fun resumePlayerIfNeeded() {
         // O leitor ficou em pausa em segundo plano: voltar a ele exatamente onde estava
         if (App.playerInBackground && App.playerTaskId != -1) {
             try {
@@ -96,63 +95,25 @@ class MainActivity : BaseActivity() {
         outState.putString("tab", tab)
     }
 
-    private val navIds = mapOf(
-        "home" to R.id.nav_home, "search" to R.id.nav_search, "live" to R.id.nav_live,
-        "library" to R.id.nav_library, "settings" to R.id.nav_settings
-    )
-
+    /** Separadores que vivem neste ecrã (Início e Biblioteca); os outros são ecrãs próprios com a mesma barra. */
     private fun setupNav() {
-        val defs = listOf(
-            Triple("home", R.drawable.ic_home, "Início"),
-            Triple("search", R.drawable.ic_search, "Pesquisa"),
-            Triple("live", R.drawable.ic_live, "TV ao vivo"),
-            Triple("library", R.drawable.ic_library, "Biblioteca"),
-            Triple("settings", R.drawable.ic_settings, "Definições")
-        )
-        for ((key, icon, label) in defs) {
-            val v = findViewById<View>(navIds.getValue(key))
-            v.findViewById<ImageView>(R.id.nav_icon).setImageResource(icon)
-            v.findViewById<TextView>(R.id.nav_label).text = label
-            v.setOnClickListener { onNav(key) }
-        }
-        // Cor do separador ativo segue a cor de destaque escolhida.
-        val tint = android.content.res.ColorStateList(
-            arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
-            intArrayOf(themeColor(R.attr.hfAccent), this.themeColor(R.attr.hfMuted))
-        )
-        for (id in navIds.values) {
-            val v = findViewById<View>(id)
-            v.findViewById<ImageView>(R.id.nav_icon).imageTintList = tint
-            v.findViewById<TextView>(R.id.nav_label).setTextColor(tint)
+        MobileNav.attach(this, tab) { key ->
+            if (key == "home" || key == "library") { if (key != tab) showTab(key); true } else false
         }
     }
 
-    private fun onNav(key: String) {
-        when (key) {
-            "home", "library" -> if (key != tab) showTab(key)
-            "search" -> startActivity(Intent(this, SearchActivity::class.java))
-            "live" -> startActivity(Intent(this, IptvActivity::class.java))
-            "settings" -> startActivity(Intent(this, SettingsActivity::class.java))
-        }
+    private fun selectNav(key: String) = MobileNav.select(this, key)
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        val t = intent?.getStringExtra("tab") ?: return
+        if (!isTv && (t == "home" || t == "library") && t != tab) showTab(t)
     }
 
-    private fun selectNav(key: String) {
-        for ((k, id) in navIds) {
-            val v = findViewById<View>(id)
-            val was = v.isSelected
-            v.isSelected = k == key
-            if (k == key && !was) {
-                // Ícone dá um pequeno salto e o indicador desliza até ao separador.
-                val icon = v.findViewById<View>(R.id.nav_icon)
-                icon.animate().scaleX(1.25f).scaleY(1.25f).setDuration(120).withEndAction {
-                    icon.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
-                }.start()
-            }
-            if (k == key) {
-                val ind = findViewById<View>(R.id.nav_indicator)
-                v.post { ind.animate().translationX(v.left + (v.width - ind.width) / 2f).setDuration(260).setInterpolator(android.view.animation.DecelerateInterpolator()).start() }
-            }
-        }
+    override fun onResume() {
+        super.onResume()
+        if (!isTv) MobileNav.select(this, tab, animate = false)
+        resumePlayerIfNeeded()
     }
 
     private fun showTab(key: String) {
@@ -166,6 +127,11 @@ class MainActivity : BaseActivity() {
     override fun onBackPressed() {
         if (!isTv && tab != "home") {
             showTab("home")
+            return
+        }
+        if (!isTv) {
+            // sair de vez: os outros separadores (Pesquisa, TV ao vivo, Definições) podem estar abertos por baixo
+            finishAffinity()
             return
         }
         @Suppress("DEPRECATION")

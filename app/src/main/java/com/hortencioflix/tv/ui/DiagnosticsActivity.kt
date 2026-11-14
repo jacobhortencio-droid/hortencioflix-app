@@ -56,14 +56,14 @@ class DiagnosticsActivity : ListScreen() {
             } else rows.add(Row("Velocidade", "— não foi possível medir"))
             if (Prefs.torboxKey.isNotEmpty()) {
                 val acc = withContext(Dispatchers.IO) { com.hortencioflix.tv.data.TorboxApi.account(fresh = true) }
-                rows.add(Row("TorBox", com.hortencioflix.tv.data.TorboxApi.summary(acc)))
+                rows.add(Row("TorBox", com.hortencioflix.tv.data.Text.maskEmails(com.hortencioflix.tv.data.TorboxApi.summary(acc))))
                 com.hortencioflix.tv.data.TorboxApi.warning(acc)?.let { rows.add(Row("⚠️ Conta TorBox", it)) }
                 val w = com.hortencioflix.tv.data.TorboxApi.watched()
                 if (w.length() > 0) rows.add(Row("A descarregar para ti", (0 until w.length()).joinToString("  ·  ") { w.optJSONObject(it)?.optString("title").orEmpty() }))
             } else rows.add(Row("TorBox", "— sem chave configurada"))
             if (Stremio.loggedIn) {
                 val st = withContext(Dispatchers.IO) { Http.ping("https://api.strem.io/api/") }
-                rows.add(Row("Conta Stremio", "${Prefs.stremioEmail} · servidor " + mark(if (st.first > 0) 200 else -1, st.second)))
+                rows.add(Row("Conta Stremio", "${com.hortencioflix.tv.data.Text.maskEmail(Prefs.stremioEmail)} · servidor " + mark(if (st.first > 0) 200 else -1, st.second)))
             } else rows.add(Row("Conta Stremio", "— não ligada"))
             val tok = Prefs.str("ghToken")
             val up = withContext(Dispatchers.IO) {
@@ -107,7 +107,7 @@ class DiagnosticsActivity : ListScreen() {
     override fun onRow(index: Int, row: Row) {}
 
     private fun share() {
-        val text = "Diagnóstico Hortêncioflix\n\n" + rows.joinToString("\n") { if (it.tag === Header) "\n== ${it.title} ==" else "${it.title}: ${it.subtitle}" }
+        val text = com.hortencioflix.tv.data.Text.maskEmails("Diagnóstico Hortêncioflix\n\n" + rows.joinToString("\n") { if (it.tag === Header) "\n== ${it.title} ==" else "${it.title}: ${it.subtitle}" })
         try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Partilhar diagnóstico")) } catch (e: Exception) {}
     }
 }

@@ -13,9 +13,13 @@ object HomeData {
             val o = arr.optJSONObject(i) ?: continue
             val d = o.optLong("d")
             val prog = if (d > 0) (o.optLong("t").toFloat() / d).coerceIn(0f, 1f) else 0f
-            val v = o.optString("v")
+            val v = o.str("v")
+            val id = o.str("m")
+            if (id.isEmpty()) continue
             val info = listOf(epLabel(v), remaining(o.optLong("t"), d)).filter { it.isNotEmpty() }.joinToString(" · ")
-            out.add(MetaItem(o.optString("m"), o.optString("y"), o.optString("n"), o.optString("p"), info = info, videoId = v, progress = prog))
+            // entradas vindas da Roku podem chegar sem nome/tipo: nunca mostrar «null»
+            val type = o.str("y").ifEmpty { if (v.count { it == ':' } >= 2) "series" else "movie" }
+            out.add(MetaItem(id, type, o.str("n"), o.str("p"), info = info, videoId = v, progress = prog))
         }
         return out
     }
@@ -34,9 +38,34 @@ object HomeData {
         val seen = HashSet<String>()
         val hidden = Prefs.array("hiddenContinue")
         val hid = (0 until hidden.length()).map { hidden.optString(it) }.toSet()
-        return (localContinue() + Stremio.continueItems().map {
-            if (it.info.isNotEmpty()) it else it.copy(info = epLabel(it.videoId))
-        }).filter { seen.add(it.id) && it.id !in hid }.take(20)
+        val remote = Stremio.continueItems().map { if (it.info.isNotEmpty()) it else it.copy(info = epLabel(it.videoId)) }
+        val byId = remote.associateBy { it.id }
+        val local = localContinue().map { m ->
+            if (m.name.isNotEmpty() && m.poster.isNotEmpty()) m
+            else byId[m.id]?.let { r -> m.copy(name = m.name.ifEmpty { r.name }, poster = m.poster.ifEmpty { r.poster }) }?.takeIf { it.name.isNotEmpty() } ?: repair(m)
+        }
+        return (local + remote).filter { seen.add(it.id) && it.id !in hid }.take(20)
+    }
+
+    /**
+     * Entrada sem nome ou capa (veio de outro aparelho incompleta): vai buscar ao catálogo e corrige o que
+     * está guardado, para não voltar a pedir. Bloqueante — chamada só fora da thread principal.
+     */
+    private fun repair(m: MetaItem): MetaItem {
+        if (!m.id.startsWith("tt")) return if (m.name.isEmpty()) m.copy(name = "Sem título") else m
+        val meta = try { Http.getJson("${Addons.CINEMETA}/meta/${m.type}/${m.id}.json")?.optJSONObject("meta") } catch (e: Exception) { null }
+        val name = m.name.ifEmpty { meta?.str("name").orEmpty() }
+        val poster = m.poster.ifEmpty { meta?.str("poster").orEmpty().ifEmpty { "https://images.metahub.space/poster/medium/${m.id}/img" } }
+        if (name.isEmpty()) return m.copy(name = "Sem título", poster = poster)
+        try {
+            val arr = Prefs.progressList()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.str("m") == m.id) { o.put("n", name); o.put("p", poster); o.put("y", m.type) }
+            }
+            Prefs.putArray("progress", arr)
+        } catch (e: Exception) {}
+        return m.copy(name = name, poster = poster)
     }
 
     /** Retira um título de «Continuar a ver» (local e conta Stremio). */

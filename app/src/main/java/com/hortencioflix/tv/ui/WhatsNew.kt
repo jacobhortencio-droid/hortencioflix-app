@@ -7,6 +7,14 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "✨ Definições redesenhadas: cartão com o estado de tudo (Stremio, TorBox, Trakt, Roku, nuvem, Internet), categorias com ícones, interruptores a sério e procura que filtra enquanto escreves",
+        "Barra de navegação sempre presente no telemóvel — Início, Pesquisa, TV ao vivo, Biblioteca e Definições à distância de um toque, em todos os ecrãs",
+        "📺 Canais mais limpos: o nome sem «FHD», «HEVC» ou «|PT|» colados (a qualidade passa para etiquetas), o programa que está a dar com barra de progresso e uma ★ para marcar favoritos com um toque",
+        "Listas IPTV grandes (20 000 canais) abrem e pesquisam sem engasgar: a lista só desenha o que está no ecrã e a procura corre em segundo plano",
+        "«Continuar a ver» já não mostra títulos «null»: o nome e a capa em falta são recuperados sozinhos (também no que vem da TV)",
+        "Privacidade: os e-mails das contas aparecem mascarados (j•••@gmail.com) nas Definições e no Diagnóstico que partilhas",
+        "Início: o destaque funde-se com a página em vez de acabar num corte, atalhos com ícones e o teu perfil no canto",
+        "Pesquisa: «Limpar» nas pesquisas recentes, e o teclado já não abre sozinho ao entrar",
         "📺 Listas IPTV mais fiáveis: contas Xtream (link get.php ou servidor + utilizador) carregam pela API, como nas outras apps — só os canais ao vivo, muito mais rápido e leve",
         "Se o servidor IPTV recusar a app, ela tenta com a identificação de outros leitores (VLC, IPTV Smarters…) e lembra-se da que funcionou, também para ver os canais",
         "Erros claros ao adicionar listas: palavra-passe errada, conta expirada (com a data), servidor em baixo, link que abre uma página web…",

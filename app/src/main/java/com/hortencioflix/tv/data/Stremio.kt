@@ -141,7 +141,7 @@ object Stremio {
             val st = o.optJSONObject("state")!!
             val dur = st.optLong("duration")
             val prog = if (dur > 0) (st.optLong("timeOffset").toFloat() / dur).coerceIn(0f, 1f) else 0f
-            MetaItem(o.optString("_id"), o.optString("type"), o.optString("name"), o.optString("poster"), videoId = st.optString("video_id"), progress = prog)
+            MetaItem(o.str("_id"), o.str("type"), o.str("name"), o.str("poster"), videoId = st.str("video_id"), progress = prog)
         }
     }
 
@@ -155,7 +155,7 @@ object Stremio {
             list.add(o)
         }
         list.sortByDescending { mtime(it) }
-        return list.take(60).map { MetaItem(it.optString("_id"), it.optString("type"), it.optString("name"), it.optString("poster")) }
+        return list.take(60).map { MetaItem(it.str("_id"), it.str("type"), it.str("name"), it.str("poster")) }
     }
 
     private fun iso(ms: Long): String {

@@ -4,16 +4,22 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <ImageView
-        android:id="@+id/hero_image"
+    <!-- imagem + véu: desvanecem para transparente na base (funde com o fundo real da página, sem corte) -->
+    <com.hortencioflix.tv.ui.FadeFrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop" />
+        android:layout_height="match_parent">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/hero_scrim" />
+        <ImageView
+            android:id="@+id/hero_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/hero_scrim" />
+    </com.hortencioflix.tv.ui.FadeFrameLayout>
 
     <LinearLayout
         android:id="@+id/hero_dots"
@@ -37,6 +43,23 @@
         android:layout_marginTop="16dp"
         android:adjustViewBounds="true"
         android:src="@drawable/logo_wordmark" />
+
+    <!-- perfil (equilibra o cabeçalho): inicial do perfil ativo; toca para mudar -->
+    <TextView
+        android:id="@+id/hero_profile"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/avatar_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:fontFamily="@font/hf_display"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -94,7 +117,10 @@
                 android:gravity="center"
                 android:paddingStart="20dp"
                 android:paddingEnd="22dp"
-                android:text="▶  Ver"
+                android:text="Ver"
+                android:drawableStart="@drawable/ic_play"
+                android:drawablePadding="8dp"
+                android:drawableTint="#FFFFFF"
                 android:textColor="#FFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
@@ -110,7 +136,10 @@
                 android:gravity="center"
                 android:paddingStart="20dp"
                 android:paddingEnd="20dp"
-                android:text="ⓘ  Detalhes"
+                android:text="Detalhes"
+                android:drawableStart="@drawable/ic_info"
+                android:drawablePadding="8dp"
+                android:drawableTint="#FFFFFF"
                 android:textColor="#FFFFFF"
                 android:textSize="15sp"
                 android:textStyle="bold" />

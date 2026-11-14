@@ -115,6 +115,25 @@
         <item name="android:textColor">?attr/hfText</item>
     </style>
 
+    <!-- botão compacto com ícone (ações no telemóvel) -->
+    <style name="HfChipButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@drawable/item_bg</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:drawablePadding">8dp</item>
+        <item name="android:drawableTint">?attr/hfText</item>
+        <item name="android:textColor">?attr/hfText</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:stateListAnimator">@animator/press_soft</item>
+    </style>
+
     <style name="HfButton">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Barra de navegação inferior (telemóvel/tablet): a mesma em todos os ecrãs de primeiro nível. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/nav_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?attr/hfCardStroke" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="?attr/hfPanel">
+
+        <!-- indicador do separador ativo: uma «pílula» por trás do ícone -->
+        <View
+            android:id="@+id/nav_indicator"
+            android:layout_width="56dp"
+            android:layout_height="30dp"
+            android:layout_gravity="top"
+            android:layout_marginTop="5dp"
+            android:alpha="0.22"
+            android:background="@drawable/nav_indicator" />
+
+        <LinearLayout
+            android:id="@+id/bottom_nav"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <include android:id="@+id/nav_home" layout="@layout/nav_item" />
+            <include android:id="@+id/nav_search" layout="@layout/nav_item" />
+            <include android:id="@+id/nav_live" layout="@layout/nav_item" />
+            <include android:id="@+id/nav_library" layout="@layout/nav_item" />
+            <include android:id="@+id/nav_settings" layout="@layout/nav_item" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

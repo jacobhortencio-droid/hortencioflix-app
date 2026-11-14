@@ -83,7 +83,7 @@ object IptvLoader {
             val streamsTxt = Http.getStringH("$base&action=get_live_streams", h) ?: return Result(emptyList(), null, "A conta está ativa mas o servidor não enviou os canais. Tenta de novo.")
             val arr = try { JSONArray(streamsTxt) } catch (e: Exception) { return Result(emptyList(), null, "A lista de canais do servidor veio inválida.") }
             val sb = StringBuilder("#EXTM3U url-tvg=\"${Iptv.xtreamEpg(listUrl)}\"\n")
-            for (i in 0 until minOf(arr.length(), 20000)) {
+            for (i in 0 until minOf(arr.length(), 60000)) {
                 val o = arr.optJSONObject(i) ?: continue
                 val id = o.optString("stream_id")
                 if (id.isEmpty()) continue
@@ -94,7 +94,7 @@ object IptvLoader {
                 sb.append(x.server).append("/live/").append(x.user).append('/').append(x.pass).append('/').append(id).append('.').append(ext).append('\n')
             }
             val text = sb.toString()
-            val groups = Iptv.parse(text, 20000)
+            val groups = Iptv.parse(text, 60000)
             if (groups.isEmpty()) return Result(emptyList(), null, "A conta está ativa mas não tem canais ao vivo.")
             PlayLog.add("📺 Xtream: ${arr.length()} canais pela API" + (if (ua != Http.UA) " (identificação: ${ua.substringBefore('/')})" else "") + (if (expTxt.isNotEmpty()) " · conta até $expTxt" else ""))
             return Result(groups, text, null, Iptv.lastEpgUrl)
@@ -146,13 +146,13 @@ object IptvLoader {
                                 skipNext = line.contains("/movie/") || line.contains("/series/")
                                 if (pendingInf != null && !skipNext) { out.append(pendingInf).append('\n').append(line).append('\n'); kept++ }
                                 pendingInf = null
-                                if (kept >= 20000) break
+                                if (kept >= 60000) break
                             }
                         }
                     }
                     if (kept == 0) { lastErr = "A lista não tem canais ao vivo reconhecidos."; return@use }
                     val text = out.toString()
-                    val groups = Iptv.parse(text, 20000)
+                    val groups = Iptv.parse(text, 60000)
                     if (groups.isNotEmpty()) {
                         rememberUa(url, ua)
                         if (ua != Http.UA) PlayLog.add("📺 Lista IPTV carregada com a identificação ${ua.substringBefore('/')}")
