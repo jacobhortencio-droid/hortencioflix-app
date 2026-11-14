@@ -739,10 +739,43 @@ class PlayerActivity : BaseActivity() {
         loadingText.text = text
         loadingBox.findViewById<View>(R.id.loading_spin).visibility = View.VISIBLE
         loadingBox.visibility = View.VISIBLE
+        centerControls(false)
     }
 
     private fun hideLoading() {
         loadingBox.visibility = View.GONE
+        centerControls(true)
+    }
+
+    /** Uma vista dos controlos do leitor, pelo nome (não depende de a biblioteca manter o identificador). */
+    private fun exoView(name: String): View? {
+        val id = resources.getIdentifier(name, "id", packageName)
+        return if (id == 0) null else playerView.findViewById(id)
+    }
+
+    /**
+     * Botões centrais (recuar · pausa · avançar): enquanto a app está a carregar ficam escondidos, senão
+     * apareciam por baixo da animação de espera. Encolhe-se em vez de esconder, porque o leitor repõe a
+     * visibilidade sempre que mostra os controlos.
+     */
+    private fun centerControls(show: Boolean) {
+        val v = exoView("exo_center_controls") ?: return
+        val k = if (show) 1f else 0f
+        v.scaleX = k
+        v.scaleY = k
+    }
+
+    /**
+     * Arruma os controlos: a TV ao vivo não tem duração (a barra «00:00 · 00:00» só confundia) e os botões
+     * de legendas/definições do leitor repetiam os de cima («Legendas», «⋯»).
+     */
+    private fun tidyControls() {
+        val k = if (Session.live) 0f else 1f
+        exoView("exo_progress")?.let { it.scaleY = k }
+        exoView("exo_time")?.let { it.scaleX = k; it.scaleY = k }
+        for (name in listOf("exo_subtitle", "exo_settings")) exoView(name)?.let {
+            it.scaleX = 0f; it.scaleY = 0f; it.isFocusable = false; it.isClickable = false
+        }
     }
 
     private fun beginLoad(text: String) {
@@ -841,9 +874,18 @@ class PlayerActivity : BaseActivity() {
     private fun updateOverlay() {
         if (Session.live) {
             val ch = Session.channels.getOrNull(channelIndex)
-            topTitle.text = ch?.name ?: ""
+            val clean = ch?.let { com.hortencioflix.tv.data.ChannelName.of(it.name) }
+            topTitle.text = clean?.name ?: ""
             val epgNow = if (ch != null) com.hortencioflix.tv.data.Epg.nowNext(ch).first else null
-            topSub.text = if (ch == null) "" else if (epgNow != null) "▶ ${epgNow.title} · até ${com.hortencioflix.tv.data.Epg.hhmm(epgNow.end)}   ·   Canal ${channelIndex + 1}/${Session.channels.size}" else "Canal ${channelIndex + 1} de ${Session.channels.size}  ·  ${ch.group}"
+            val xNow = if (ch != null && epgNow == null) com.hortencioflix.tv.data.XtreamNow.cached(ch.url) else null
+            val nowTitle = epgNow?.title ?: xNow?.title
+            val nowEnd = epgNow?.end ?: xNow?.end ?: 0L
+            val tags = clean?.badges?.joinToString(" · ") ?: ""
+            topSub.text = when {
+                ch == null -> ""
+                nowTitle != null -> "▶ $nowTitle · até ${com.hortencioflix.tv.data.Epg.hhmm(nowEnd)}" + (if (tags.isNotEmpty()) "   ·   $tags" else "")
+                else -> listOf(tags, com.hortencioflix.tv.data.ChannelFacets.groupLabel(ch.group), "canal ${channelIndex + 1} de ${Session.channels.size}").filter { it.isNotEmpty() }.joinToString("   ·   ")
+            }
             btnSources.text = "Canais"
         } else {
             val meta = Session.meta
@@ -857,6 +899,7 @@ class PlayerActivity : BaseActivity() {
             topSub.text = parts.joinToString("   ·   ")
             btnSources.text = "Fontes"
         }
+        tidyControls()
         fade(topBar, controlsVisible)
         btnNext.visibility = if (controlsVisible && !Session.live && nextEpisodeId() != null) View.VISIBLE else View.GONE
     }
@@ -930,9 +973,13 @@ class PlayerActivity : BaseActivity() {
         Prefs.put("lastChannel", ch.url)
         Prefs.addRecentChannel(ch)
         val token = ++zapToken
-        beginLoad("A sintonizar ${ch.name}…")
+        // o nome aparece uma vez só (no cartão do canal), sem as etiquetas técnicas coladas
+        val zapName = com.hortencioflix.tv.data.ChannelName.of(ch.name)
+        beginLoad("A sintonizar…")
         updateOverlay()
-        showOsd("${idx + 1}.  ${ch.name}" + (if (isTv) "\n▲▼ mudar de canal" else ""), 3000)
+        showOsd("${idx + 1}  ·  ${zapName.name}" + (if (zapName.badges.isNotEmpty()) "   " + zapName.badges.joinToString(" · ") else "") + (if (isTv) "\n▲▼ mudar de canal" else ""), 3000)
+        // programa atual das contas Xtream (quando não há guia carregado)
+        if (com.hortencioflix.tv.data.XtreamNow.supports(ch.url)) com.hortencioflix.tv.data.XtreamNow.request(ch.url) { if (!isFinishing && channelIndex == idx) updateOverlay() }
         if (ch.url.startsWith("stremio:")) {
             // Canal de um add-on de TV: pedir as fontes ao add-on.
             player?.stop()

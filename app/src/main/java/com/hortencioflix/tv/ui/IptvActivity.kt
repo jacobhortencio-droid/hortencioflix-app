@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hortencioflix.tv.R
 import com.hortencioflix.tv.data.Addons
 import com.hortencioflix.tv.data.Channel
+import com.hortencioflix.tv.data.ChannelFacets
 import com.hortencioflix.tv.data.ChannelGroup
 import com.hortencioflix.tv.data.Epg
 import com.hortencioflix.tv.data.Http
@@ -48,6 +49,19 @@ class IptvActivity : BaseActivity() {
     private var lastUrl = ""
     private var adultUnlocked = false
     private var showingFavs = false
+
+    // Filtros por tipo de conteúdo e por país (calculados a partir dos grupos e dos nomes dos canais)
+    private lateinit var typeAdapter: RowAdapter
+    private lateinit var typesView: RecyclerView
+    private var btnRegion: TextView? = null
+    private var baseGroups: List<ChannelGroup> = emptyList()
+    private var kinds: Map<String, ChannelFacets.Kind> = emptyMap()
+    private var regions: Map<String, String> = emptyMap()
+    private var kindFilter: ChannelFacets.Kind? = null
+    private var regionFilter = ""
+    private var typeKinds: List<ChannelFacets.Kind?> = emptyList()
+    private var regionCounts: List<Pair<String, Int>> = emptyList()
+    private var gridMode = false
     private val adultRe = Regex("(adult|xxx|\\+18|18\\+|porn|erotic|for adults)", RegexOption.IGNORE_CASE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,8 +90,20 @@ class IptvActivity : BaseActivity() {
             }
         }, onLong = { ch -> if (showingFavs) favMenu(ch) else toggleFav(ch) }, onFav = { ch -> toggleFav(ch) })
         channelAdapter.favorites = Prefs.favoriteChannels().map { it.url }.toSet()
-        channelsView.layoutManager = LinearLayoutManager(this)
-        channelsView.adapter = channelAdapter
+        gridMode = findViewById<View?>(R.id.btn_view) != null && Prefs.str("iptvGrid") == "1"
+        applyViewMode()
+        findViewById<View?>(R.id.btn_view)?.setOnClickListener {
+            gridMode = !gridMode
+            Prefs.put("iptvGrid", if (gridMode) "1" else "0")
+            applyViewMode()
+            channelsView.post { requestNowForVisible() }
+        }
+        typesView = findViewById(R.id.types)
+        typeAdapter = RowAdapter(emptyList(), chip = true, onClick = { i, _ -> kindFilter = typeKinds.getOrNull(i); onFacetsChanged() })
+        typesView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        typesView.adapter = typeAdapter
+        btnRegion = findViewById(R.id.btn_region)
+        btnRegion?.setOnClickListener { regionMenu() }
         channelsView.itemAnimator = null
         channelsView.setHasFixedSize(true)
         // «A dar agora» das contas Xtream: pede só para os canais que ficam no ecrã quando a lista pára
@@ -155,6 +181,7 @@ class IptvActivity : BaseActivity() {
     private fun showGroup(i: Int) {
         val g = groups.getOrNull(i) ?: return
         mixedGroup = g.title == "Todos" || g.title.startsWith("🕘") || g.title == "Favoritos"
+        if (groupAdapterChip()) groupAdapter.select(i)
         if (currentGroup === g.channels && search.text.isEmpty()) return
         currentGroup = g.channels
         if (search.text.isNotEmpty()) { applyFilter(); return }
@@ -181,9 +208,10 @@ class IptvActivity : BaseActivity() {
         val names = normNames
         val all = allChannels
         val found = ArrayList<Channel>()
-        if (names.size == all.size) { for (i in all.indices) if (names[i].contains(q)) found.add(all[i]) }
-        else for (c in all) if (Epg.norm(c.name).contains(q)) found.add(c)
-        status.text = com.hortencioflix.tv.data.Text.plural(found.size, "canal encontrado", "canais encontrados")
+        val facet = facetsActive()
+        if (names.size == all.size) { for (i in all.indices) if (names[i].contains(q) && (!facet || passes(all[i]))) found.add(all[i]) }
+        else for (c in all) if (Epg.norm(c.name).contains(q) && (!facet || passes(c))) found.add(c)
+        status.text = com.hortencioflix.tv.data.Text.plural(found.size, "canal encontrado", "canais encontrados") + (if (facet) " em " + facetLabel() else "")
         showChannels(found)
     }
 
@@ -200,38 +228,186 @@ class IptvActivity : BaseActivity() {
         }
     }
 
+    private fun adultLocked() = Prefs.isKids || (Prefs.pin.isNotEmpty() && !adultUnlocked)
+
     private fun setGroups(input: List<ChannelGroup>) {
-        val recents = Prefs.recentChannels()
         val hidden = Prefs.hiddenGroups()
-        val locked = Prefs.isKids || (Prefs.pin.isNotEmpty() && !adultUnlocked)
+        val locked = adultLocked()
         val visible = input.filter { g -> g.title !in hidden && !(locked && adultRe.containsMatchIn(g.title)) }
             .map { g -> if (locked && g.title == "Todos") ChannelGroup(g.title, g.channels.filter { !adultRe.containsMatchIn(it.group) }) else g }
-        val list = if (visible.isNotEmpty() && recents.isNotEmpty()) listOf(ChannelGroup("🕘 Recentes", recents)) + visible else visible
-        groups = list
-        // índice de pesquisa e logótipos genéricos (o mesmo ícone em muitos canais), calculados fora do ecrã
+        baseGroups = visible
+        // índice de pesquisa, logótipos genéricos (o mesmo ícone em muitos canais), tipo de conteúdo e país:
+        // tudo calculado fora do ecrã, uma vez por lista
         val flat = LinkedHashMap<String, Channel>()
         for (g in visible) for (c in g.channels) flat.putIfAbsent(c.url, c)
         allChannels = flat.values.toList()
         normNames = emptyList()
+        kinds = emptyMap()
+        regions = emptyMap()
+        typesView.visibility = View.GONE
+        btnRegion?.visibility = View.GONE
         val snapshot = allChannels
         lifecycleScope.launch {
-            val (names, generic) = withContext(Dispatchers.Default) {
-                snapshot.map { Epg.norm(it.name) } to snapshot.groupingBy { it.logo }.eachCount().filter { it.key.isNotEmpty() && it.value >= 8 }.keys
+            class Calc(val names: List<String>, val generic: Set<String>, val k: Map<String, ChannelFacets.Kind>, val r: Map<String, String>)
+            val c = withContext(Dispatchers.Default) {
+                val k = HashMap<String, ChannelFacets.Kind>(snapshot.size * 2)
+                val r = HashMap<String, String>()
+                for (ch in snapshot) {
+                    k[ch.url] = ChannelFacets.kind(ch)
+                    val reg = ChannelFacets.region(ch)
+                    if (reg.isNotEmpty()) r[ch.url] = reg
+                }
+                Calc(snapshot.map { Epg.norm(it.name) }, snapshot.groupingBy { it.logo }.eachCount().filter { it.key.isNotEmpty() && it.value >= 8 }.keys, k, r)
             }
-            if (allChannels === snapshot) {
-                normNames = names
-                if (generic != channelAdapter.genericLogos) { channelAdapter.genericLogos = generic; channelAdapter.notifyDataSetChanged() }
+            if (allChannels === snapshot && !isFinishing) {
+                normNames = c.names
+                kinds = c.k
+                regions = c.r
+                if (c.generic != channelAdapter.genericLogos) { channelAdapter.genericLogos = c.generic; channelAdapter.notifyDataSetChanged() }
+                updateRegionButton()
+                buildTypes()
+                if (facetsActive()) { renderGroups(); status.text = facetLabel() + "  ·  " + com.hortencioflix.tv.data.Text.plural(facetCount(), "canal", "canais") }
             }
         }
+        renderGroups()
+    }
+
+    private fun facetsActive() = kinds.isNotEmpty() && (kindFilter != null || regionFilter.isNotEmpty())
+
+    private fun passes(c: Channel): Boolean {
+        val k = kindFilter
+        if (k != null && kinds[c.url] != k) return false
+        if (regionFilter.isNotEmpty() && regions[c.url] != regionFilter) return false
+        return true
+    }
+
+    private fun facetLabel(): String =
+        listOfNotNull(kindFilter?.label, regionFilter.takeIf { it.isNotEmpty() }?.let { ChannelFacets.regionLabel(it) }).joinToString(" · ")
+
+    private fun facetCount(): Int = allChannels.count { passes(it) }
+
+    /** Grupos a mostrar: os do fornecedor, só com os canais do tipo/país escolhido (os grupos vazios desaparecem). */
+    private fun renderGroups() {
+        val recents = Prefs.recentChannels()
+        val filtering = facetsActive()
+        val vis: List<ChannelGroup> = if (!filtering) baseGroups else {
+            val out = ArrayList<ChannelGroup>()
+            for (g in baseGroups) {
+                val l = g.channels.filter { passes(it) }
+                if (l.isNotEmpty()) out.add(ChannelGroup(g.title, l))
+            }
+            if (out.size > 1 && out[0].title != "Todos") {
+                val seen = HashSet<String>()
+                out.add(0, ChannelGroup("Todos", out.flatMap { it.channels }.filter { seen.add(it.url) }))
+            }
+            out
+        }
+        val withRecents = vis.isNotEmpty() && recents.isNotEmpty() && !filtering
+        val list = if (withRecents) listOf(ChannelGroup("🕘 Recentes", recents)) + vis else vis
+        groups = list
+        groupAdapter.select(-1)
         groupAdapter.update(list.map {
             val recent = it.title.startsWith("🕘")
-            val label = if (recent) "Recentes" else it.title
+            var label = if (recent) "Recentes" else ChannelFacets.groupLabel(it.title)
+            // com um país escolhido, o código repetido em todos os grupos («PT · ») só faz ruído
+            if (regionFilter.isNotEmpty()) label = label.removePrefix("$regionFilter · ")
             val n = com.hortencioflix.tv.data.Text.num(it.channels.size)
             Row(if (groupAdapterChip()) "$label  $n" else label, com.hortencioflix.tv.data.Text.plural(it.channels.size, "canal", "canais"), icon = if (recent) R.drawable.ic_history else 0)
         })
         shown = emptyList()
         currentGroup = emptyList()
-        if (list.isEmpty()) showChannels(emptyList()) else showGroup(if (recents.isNotEmpty() && visible.isNotEmpty()) 1 else 0)
+        if (list.isEmpty()) showChannels(emptyList()) else showGroup(if (withRecents) 1 else 0)
+    }
+
+    private fun kindIcon(k: ChannelFacets.Kind) = when (k) {
+        ChannelFacets.Kind.SPORT -> R.drawable.ic_sports
+        ChannelFacets.Kind.MOVIES -> R.drawable.ic_movie
+        ChannelFacets.Kind.SERIES -> R.drawable.ic_tv
+        ChannelFacets.Kind.NEWS -> R.drawable.ic_news
+        ChannelFacets.Kind.KIDS -> R.drawable.ic_kids
+        ChannelFacets.Kind.DOCS -> R.drawable.ic_docs
+        ChannelFacets.Kind.MUSIC -> R.drawable.ic_music
+        ChannelFacets.Kind.ENT -> R.drawable.ic_ticket
+        ChannelFacets.Kind.RELIGION -> R.drawable.ic_faith
+        ChannelFacets.Kind.ADULT -> R.drawable.ic_lock
+        ChannelFacets.Kind.OTHER -> R.drawable.ic_more
+    }
+
+    /** Fila «Tudo · Desporto · Filmes · Notícias…» com o número de canais de cada tipo (no país escolhido). */
+    private fun buildTypes() {
+        val all = ChannelFacets.Kind.values()
+        val counts = IntArray(all.size)
+        var total = 0
+        val locked = adultLocked()
+        for (c in allChannels) {
+            if (regionFilter.isNotEmpty() && regions[c.url] != regionFilter) continue
+            val k = kinds[c.url] ?: continue
+            total++
+            if (locked && k == ChannelFacets.Kind.ADULT) continue
+            counts[k.ordinal]++
+        }
+        val present = all.filter { counts[it.ordinal] > 0 }
+        val useful = !showingFavs && total >= 30 && present.count { it != ChannelFacets.Kind.OTHER } >= 2
+        val cur = kindFilter
+        if (!useful || (cur != null && counts[cur.ordinal] == 0)) kindFilter = null
+        if (!useful) { typesView.visibility = View.GONE; typeKinds = emptyList(); return }
+        typeKinds = listOf<ChannelFacets.Kind?>(null) + present
+        typeAdapter.update(typeKinds.map { k ->
+            if (k == null) Row("Tudo  " + com.hortencioflix.tv.data.Text.num(total), icon = R.drawable.ic_live)
+            else Row(k.label + "  " + com.hortencioflix.tv.data.Text.num(counts[k.ordinal]), icon = kindIcon(k))
+        })
+        typeAdapter.select(typeKinds.indexOf(kindFilter))
+        typesView.visibility = View.VISIBLE
+    }
+
+    private fun updateRegionButton() {
+        val b = btnRegion ?: return
+        val counts = HashMap<String, Int>()
+        var known = 0
+        for (c in allChannels) {
+            val r = regions[c.url] ?: continue
+            counts[r] = (counts[r] ?: 0) + 1
+            known++
+        }
+        regionCounts = counts.entries.sortedByDescending { it.value }.map { it.key to it.value }
+        // só vale a pena quando a lista mistura países e a maior parte dos canais diz de onde é
+        val useful = !showingFavs && allChannels.size >= 30 && regionCounts.size >= 2 && known * 5 >= allChannels.size
+        if (!useful || (regionFilter.isNotEmpty() && regionFilter !in counts)) regionFilter = ""
+        b.visibility = if (useful) View.VISIBLE else View.GONE
+        b.text = if (regionFilter.isEmpty()) "País" else ChannelFacets.regionLabel(regionFilter)
+        b.isSelected = regionFilter.isNotEmpty()
+    }
+
+    private fun regionMenu() {
+        val num = { n: Int -> com.hortencioflix.tv.data.Text.num(n) }
+        val labels = listOf("Todos os países  (" + num(allChannels.size) + ")") +
+            regionCounts.map { (if (it.first == regionFilter) "✓ " else "") + ChannelFacets.regionLabel(it.first) + "  (" + num(it.second) + ")" }
+        choiceDialog("País ou língua", labels) { w ->
+            regionFilter = if (w == 0) "" else regionCounts.getOrNull(w - 1)?.first ?: ""
+            if (lastUrl.isNotEmpty()) Prefs.put("iptvRegion:" + Integer.toHexString(lastUrl.hashCode()), regionFilter)
+            onFacetsChanged()
+        }
+    }
+
+    /** Mudou o tipo ou o país: refaz os chips, os grupos e a lista (a pesquisa escrita mantém-se, dentro do filtro). */
+    private fun onFacetsChanged() {
+        updateRegionButton()
+        buildTypes()
+        renderGroups()
+        if (search.text.isEmpty()) {
+            status.text = if (facetsActive()) facetLabel() + "  ·  " + com.hortencioflix.tv.data.Text.plural(facetCount(), "canal", "canais")
+            else com.hortencioflix.tv.data.Text.plural(allChannels.size, "canal", "canais")
+        }
+    }
+
+    /** Lista (com o programa a dar) ou mosaico (logótipos grandes). */
+    private fun applyViewMode() {
+        channelAdapter.grid = gridMode
+        val span = maxOf(3, (resources.displayMetrics.widthPixels - dp(32)) / dp(118))
+        channelsView.layoutManager = if (gridMode) androidx.recyclerview.widget.GridLayoutManager(this, span) else LinearLayoutManager(this)
+        // volta a ligar o adaptador: as linhas do outro formato não são reaproveitadas
+        channelsView.adapter = channelAdapter
+        findViewById<android.widget.ImageView?>(R.id.btn_view)?.setImageResource(if (gridMode) R.drawable.ic_list else R.drawable.ic_grid)
     }
 
     private fun groupAdapterChip() = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
@@ -288,6 +464,8 @@ class IptvActivity : BaseActivity() {
 
     private fun showFavorites() {
         showingFavs = true
+        kindFilter = null
+        regionFilter = ""
         val favs = Prefs.favoriteChannels()
         listName.text = "★ Favoritos"
         if (favs.isEmpty()) {
@@ -303,6 +481,9 @@ class IptvActivity : BaseActivity() {
 
     private fun loadList(name: String, url: String) {
         showingFavs = false
+        kindFilter = null
+        // o país escolhido fica guardado por lista (quem só quer os canais portugueses não escolhe de novo)
+        regionFilter = Prefs.str("iptvRegion:" + Integer.toHexString(url.hashCode()))
         listName.text = name
         status.text = "A carregar lista…"
         lastName = name

@@ -508,6 +508,7 @@ class SettingsActivity : BaseActivity() {
         rows.add(Row("Sinopses em português", onOff(Prefs.str("ptMeta", "1") == "1") + (if (Prefs.str("tmdbKey").isEmpty()) " — pelo Trakt; com uma chave TMDB (grátis em themoviedb.org) há muito mais títulos traduzidos" else " — TMDB e Trakt"), tag = "ptMeta"))
         rows.add(Row("Fontes curadas (servidor próprio)", (if (Prefs.str("curatorUrl").isEmpty()) "Desligado" else if (Prefs.str("curatorOn", "1") == "1") "Ligado" else "Pausado") + " — um só pedido junta as fontes de todos os add-ons, sem repetidos, e confirma no TorBox o que está pronto", tag = "curator"))
         rows.add(Row("Mini-leitor automático", onOff(Prefs.str("pipAuto", "1") == "1") + " — ao sair da app com um vídeo a tocar, continua numa janela pequena", tag = "pipAuto"))
+        rows.add(Row("Tocar em «Continuar a ver»", (if (Prefs.str("continueTap") == "play") "Retoma logo o vídeo" else "Abre a página do título") + " — toca para mudar", tag = "continueTap"))
         rows.add(Row("Voltar onde estavas", onOff(Prefs.str("restoreSession", "1") == "1") + " — se o Android fechar a app a meio de um vídeo, ao abrir volta ao mesmo ponto", tag = "restoreSession"))
         rows.add(Row("Perguntar ao retomar", onOff(Prefs.askResume) + " — «Continuar de 23:10 / Começar do início»", tag = "askResume"))
         rows.add(Row("Próximo episódio automático", onOff(Prefs.autoNext) + " — contagem de 10 s no fim do episódio", tag = "autoNext"))
@@ -633,6 +634,7 @@ class SettingsActivity : BaseActivity() {
                 }
             }
             "pipAuto" -> { Prefs.put("pipAuto", if (Prefs.str("pipAuto", "1") == "1") "0" else "1"); refresh() }
+            "continueTap" -> { Prefs.put("continueTap", if (Prefs.str("continueTap") == "play") "page" else "play"); refresh() }
             "restoreSession" -> { Prefs.put("restoreSession", if (Prefs.str("restoreSession", "1") == "1") "0" else "1"); refresh() }
             "rokuType" -> inputDialog("Escrever na TV", "Nome do filme…", "") { txt ->
                 if (txt.isNotEmpty()) lifecycleScope.launch {

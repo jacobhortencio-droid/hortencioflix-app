@@ -33,6 +33,8 @@ class ChannelAdapter(
     var genericLogos: Set<String> = emptySet()
     /** Mostrar o grupo por baixo do nome (listas misturadas: «Todos», pesquisa, recentes, favoritos). */
     var showGroup = true
+    /** Mosaico (cartões com o logótipo grande) em vez de lista. */
+    var grid = false
 
     fun submit(list: List<Channel>) {
         items = list
@@ -58,8 +60,10 @@ class ChannelAdapter(
         var url = ""
     }
 
+    override fun getItemViewType(position: Int) = if (grid) 1 else 0
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        VH(LayoutInflater.from(parent.context).inflate(R.layout.item_channel, parent, false))
+        VH(LayoutInflater.from(parent.context).inflate(if (viewType == 1) R.layout.item_channel_card else R.layout.item_channel, parent, false))
 
     override fun getItemCount() = items.size
 
@@ -69,7 +73,6 @@ class ChannelAdapter(
 
     override fun onBindViewHolder(h: VH, position: Int) {
         val ch = items[position]
-        val ctx = h.itemView.context
         h.url = ch.url
         val clean = ChannelName.of(ch.name)
         h.name.text = clean.name
@@ -90,16 +93,16 @@ class ChannelAdapter(
         h.itemView.alpha = if (ch.url in dead) 0.5f else 1f
         h.itemView.setOnClickListener { val p = h.bindingAdapterPosition; if (p >= 0) onClick(p, items[p]) }
         h.itemView.setOnLongClickListener { val p = h.bindingAdapterPosition; if (p >= 0) onLong(items[p]); true }
-        if (touch) {
-            h.fav.visibility = View.VISIBLE
-            h.fav.setOnClickListener { val p = h.bindingAdapterPosition; if (p >= 0) onFav(items[p]) }
-        } else h.fav.visibility = View.GONE
+        if (touch) h.fav.setOnClickListener { val p = h.bindingAdapterPosition; if (p >= 0) onFav(items[p]) }
     }
 
     /** Programa a dar agora (do guia, ou da conta Xtream) e estado do favorito. */
     private fun bindNow(h: VH, ch: Channel) {
         val ctx = h.itemView.context
         val isFav = ch.url in favorites
+        // no telemóvel a estrela é um botão; na TV (e no mosaico) só aparece nos favoritos, como marca
+        h.fav.visibility = if (isFav || (touch && !grid)) View.VISIBLE else View.GONE
+        h.fav.isClickable = touch
         h.fav.setImageResource(if (isFav) R.drawable.ic_star else R.drawable.ic_star_outline)
         h.fav.imageTintList = android.content.res.ColorStateList.valueOf(if (isFav) 0xFFFFC107.toInt() else ctx.themeColor(R.attr.hfMuted))
         val t = System.currentTimeMillis()
@@ -110,15 +113,16 @@ class ChannelAdapter(
         val end = epg?.end ?: x?.end ?: 0L
         val off = if (ch.url in dead) "offline  ·  " else ""
         if (title != null && end > start) {
-            h.now.text = off + title + "  ·  até " + Epg.hhmm(end)
+            h.now.text = if (grid) off + title else off + title + "  ·  até " + Epg.hhmm(end)
             h.now.setTextColor(ctx.themeColor(R.attr.hfText))
             h.progress.visibility = View.VISIBLE
             h.progress.progress = (((t - start) * 100) / (end - start)).toInt().coerceIn(2, 100)
         } else {
-            val g = if (showGroup) ch.group else ""
+            val g = if (showGroup && !grid) com.hortencioflix.tv.data.ChannelFacets.groupLabel(ch.group) else ""
             h.now.text = off + g
             h.now.setTextColor(ctx.themeColor(R.attr.hfMuted))
-            h.now.visibility = if ((off + g).isEmpty()) View.GONE else View.VISIBLE
+            // no mosaico a linha fica sempre (vazia), para os cartões terem todos a mesma altura
+            h.now.visibility = if ((off + g).isEmpty() && !grid) View.GONE else View.VISIBLE
             h.progress.visibility = View.GONE
             return
         }

@@ -244,8 +244,9 @@ class DetailsActivity : BaseActivity() {
             content.setPadding(dp(48), dp(40), endPad, dp(32))
             btnPlay.layoutParams = (btnPlay.layoutParams as LinearLayout.LayoutParams).apply { width = ViewGroup.LayoutParams.WRAP_CONTENT }
         } else {
-            val h = (dm.widthPixels * 0.66f).toInt()
             val vh = dm.widthPixels * 9 / 16
+            // com trailer, a imagem de fundo ocupa exatamente a janela do trailer (16:9): nada espreita por baixo dele
+            val h = if (withTrailer) vh else (dm.widthPixels * 0.66f).toInt()
             bg.layoutParams = (bg.layoutParams as FrameLayout.LayoutParams).apply { height = h }
             scrim.layoutParams = (scrim.layoutParams as FrameLayout.LayoutParams).apply { height = h }
             scrim.setBackgroundResource(R.drawable.scrim_bottom)
@@ -253,7 +254,7 @@ class DetailsActivity : BaseActivity() {
                 width = ViewGroup.LayoutParams.MATCH_PARENT; height = vh; gravity = android.view.Gravity.TOP
             }
             findViewById<View>(R.id.trailer_fade).setBackgroundResource(R.drawable.trailer_fade_bottom)
-            content.setPadding(dp(20), if (withTrailer) maxOf(h - dp(120), vh + dp(4)) else h - dp(120), dp(20), dp(32))
+            content.setPadding(dp(20), if (withTrailer) vh + dp(10) else h - dp(120), dp(20), dp(32))
         }
     }
 

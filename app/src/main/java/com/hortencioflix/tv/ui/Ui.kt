@@ -190,6 +190,18 @@ class RowAdapter(
         notifyDataSetChanged()
     }
 
+    /** Chip ativo (só no modo chip): fica preenchido com a cor de destaque. */
+    var selected = -1
+        private set
+
+    fun select(i: Int) {
+        if (i == selected) return
+        val old = selected
+        selected = i
+        if (old in items.indices) notifyItemChanged(old)
+        if (i in items.indices) notifyItemChanged(i)
+    }
+
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val title: TextView = v.findViewById(R.id.row_title)
         val subtitle: TextView? = v.findViewById(R.id.row_subtitle)
@@ -226,6 +238,7 @@ class RowAdapter(
         h.title.text = r.title
         if (r.tag === Header) return
         if (chip) {
+            h.itemView.isSelected = position == selected
             // ícone vetorial (com a cor do texto) em vez de emoji
             val d = if (r.icon != 0) androidx.core.content.ContextCompat.getDrawable(h.title.context, r.icon)?.mutate() else null
             d?.setTint(h.title.currentTextColor)

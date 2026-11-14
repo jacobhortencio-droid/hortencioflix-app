@@ -28,9 +28,10 @@ object Trailer {
             "autoplay=1&mute=1&controls=0&loop=1&playlist=$id&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&disablekb=1&fs=0&start=8"
         else
             "autoplay=1&controls=1&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&fs=0"
-        // em pré-visualização o vídeo cobre o ecrã todo (corta as barras pretas), como uma imagem de fundo viva
+        // em pré-visualização o vídeo cobre a janela toda e é aproximado 1,3×: a maior parte dos trailers é em
+        // formato de cinema (2,39:1) dentro de um vídeo 16:9, e sem isto ficavam barras pretas em cima e em baixo
         val box = if (preview)
-            "position:absolute;top:50%;left:50%;width:177.78vh;height:100vh;min-width:100vw;min-height:56.25vw;transform:translate(-50%,-50%)"
+            "position:absolute;top:50%;left:50%;width:177.78vh;height:100vh;min-width:100vw;min-height:56.25vw;transform:translate(-50%,-50%) scale(1.3)"
         else "position:absolute;inset:0;width:100%;height:100%"
         return """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}</style></head><body>

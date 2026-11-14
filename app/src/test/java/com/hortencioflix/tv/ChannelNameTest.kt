@@ -15,12 +15,48 @@ class ChannelNameTest {
         assertEquals("EVENEMENT SPORT", c("|4K| EVENEMENT SPORT HDR/UHD/4K").name)
     }
 
-    @Test fun keepsPlusAndCountry() {
+    @Test fun keepsPlusAndMovesCountryToBadge() {
         assertEquals("CANAL+ BOX OFFICE", c("|4K| CANAL+ BOX OFFICE UHD/4K").name)
-        assertEquals("PT| RTP 1", c("PT| RTP 1 FHD").name)
-        assertEquals(listOf("FHD"), c("PT| RTP 1 FHD").badges)
-        assertEquals("FR: TF1", c("FR: TF1 HD HEVC").name)
-        assertEquals(listOf("HD", "HEVC"), c("FR: TF1 HD HEVC").badges)
+        assertEquals("RTP 1", c("PT| RTP 1 FHD").name)
+        assertEquals(listOf("PT", "FHD"), c("PT| RTP 1 FHD").badges)
+        assertEquals("TF1", c("FR: TF1 HD HEVC").name)
+        assertEquals(listOf("FR", "HD", "HEVC"), c("FR: TF1 HD HEVC").badges)
+        assertEquals("ZAP VIVA", c("PT - ZAP VIVA UHD").name)
+        assertEquals(listOf("PT", "4K"), c("PT - ZAP VIVA UHD").badges)
+        assertEquals("TV Record", c("TV - Record").name)             // «TV» não é um país
+    }
+
+    private fun ch(name: String, group: String) = com.hortencioflix.tv.data.Channel(name, "", "http://x/$name", group)
+
+    @Test fun contentType() {
+        val K = com.hortencioflix.tv.data.ChannelFacets.Kind
+        fun k(name: String, group: String = "") = com.hortencioflix.tv.data.ChannelFacets.kind(ch(name, group))
+        assertEquals(K.SPORT, k("SPORT TV 1", "|PT| DESPORTO"))
+        assertEquals(K.SPORT, k("Fox Sports 2"))
+        assertEquals(K.SPORT, k("Sky Sports News"))
+        assertEquals(K.NEWS, k("SIC Notícias", "PORTUGAL"))
+        assertEquals(K.NEWS, k("CMTV"))                              // «mtv» dentro de CMTV não é música
+        assertEquals(K.MUSIC, k("MTV Live"))
+        assertEquals(K.KIDS, k("Discovery Kids"))
+        assertEquals(K.DOCS, k("Discovery Channel"))
+        assertEquals(K.MOVIES, k("TVCine Top"))
+        assertEquals(K.MOVIES, k("Qualquer", "PT | FILMES E SÉRIES"))
+        assertEquals(K.SERIES, k("AXN White"))
+        assertEquals(K.ENT, k("PT - ZAP VIVA UHD", "|PT| INTERNACIONAL"))
+        assertEquals(K.ADULT, k("Canal", "ADULTOS +18"))
+        assertEquals(K.OTHER, k("Canal 123"))
+    }
+
+    @Test fun regionAndGroupLabel() {
+        val F = com.hortencioflix.tv.data.ChannelFacets
+        assertEquals("PT", F.region(ch("RTP 1", "|PT| INTERNACIONAL")))
+        assertEquals("BR", F.region(ch("BR: Globo SP", "Canais")))
+        assertEquals("PT", F.region(ch("RTP 1", "PORTUGAL")))
+        assertEquals("", F.region(ch("HD - Canal", "Variedades")))
+        assertEquals("PT · Internacional", F.groupLabel("|PT| INTERNACIONAL"))
+        assertEquals("Canais de Desporto", F.groupLabel("CANAIS DE DESPORTO"))
+        assertEquals("Filmes 4K", F.groupLabel("FILMES 4K"))
+        assertEquals("Séries e Novelas", F.groupLabel("Séries e Novelas"))
     }
 
     @Test fun doesNotEatWords() {

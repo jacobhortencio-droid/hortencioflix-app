@@ -7,6 +7,13 @@ import com.hortencioflix.tv.data.Prefs
 /** «O que há de novo» — aparece uma vez depois de cada atualização. */
 object WhatsNew {
     private val NOTES = listOf(
+        "📺 TV ao vivo por tipo de conteúdo: Desporto, Filmes, Séries, Notícias, Infantil, Documentários, Música… com o número de canais de cada um — a app arruma sozinha os milhares de canais da lista",
+        "Filtro por país (Portugal, Brasil, Angola…) quando a lista mistura vários; fica guardado por lista, e a procura passa a ser dentro do tipo e do país escolhidos",
+        "Canais em mosaico: um toque no botão ao lado da procura troca a lista por cartões com o logótipo grande",
+        "Nomes de canais e de grupos mais limpos: «PT - ZAP VIVA UHD» fica «ZAP VIVA» com os selos PT · 4K, e os grupos deixam de vir em maiúsculas",
+        "Tocar num título de «Continuar a ver» abre a página do título em vez de começar logo a reproduzir (muda em Definições › Leitor se preferires retomar logo)",
+        "Leitor: a animação de espera já não fica por cima dos botões, a TV ao vivo deixou de mostrar «00:00 · 00:00» e os botões repetidos em baixo saíram",
+        "Página do título: o trailer ocupa a janela toda, sem barras pretas nem a tira de imagem por baixo",
         "🎧 Áudio e legendas ficam guardados por título: escolhe uma vez (ex.: japonês com legendas, ou legendas desligadas) e os episódios seguintes abrem igual",
         "Roku 0.22.2: as contas Xtream carregam pela conta (como no telemóvel) mesmo quando o fornecedor bloqueia o ficheiro da lista; a sincronização passa-lhe a identificação que o servidor aceitou aqui",
         "✨ Definições redesenhadas: cartão com o estado de tudo (Stremio, TorBox, Trakt, Roku, nuvem, Internet), categorias com ícones, interruptores a sério e procura que filtra enquanto escreves",

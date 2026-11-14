@@ -49,6 +49,12 @@
             android:id="@+id/btn_guide"
             style="@style/HfButton"
             android:text="Guia TV" />
+
+        <TextView
+            android:id="@+id/btn_region"
+            style="@style/HfButton"
+            android:text="País"
+            android:visibility="gone" />
     </LinearLayout>
 
     <TextView
@@ -102,6 +108,13 @@
         android:layout_marginTop="12dp"
         android:visibility="gone" />
 
+    <!-- tipo de conteúdo: Desporto, Filmes, Notícias… -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/types"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:visibility="gone" />
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"

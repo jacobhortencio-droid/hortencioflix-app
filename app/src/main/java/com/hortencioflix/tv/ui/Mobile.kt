@@ -213,6 +213,9 @@ fun continueMenu(ctx: android.content.Context, m: MetaItem, done: () -> Unit) {
         }.show()
 }
 
+/** Tocar num título de «Continuar a ver»: abre a página do título (predefinição) ou retoma logo (Definições). */
+fun resumeOnTap() = com.hortencioflix.tv.data.Prefs.str("continueTap") == "play"
+
 private fun Fragment.openMeta(m: MetaItem, play: Boolean = false) {
     val ctx = context ?: return
     if (m.id.startsWith("iptv:")) { val a = activity; if (a != null && IptvVod.resume(a, m)) return }
@@ -437,7 +440,7 @@ class MobileHomeFragment : Fragment() {
                     continueItems = continueItems.filter { it.id != m.id }
                     adapter.rebuild()
                 }
-            }) { openMeta(it, play = true) } else if (t == NEW_EPS) PosterAdapter(items) { openMeta(it) } else PosterAdapter(items) { openMeta(it) }
+            }) { openMeta(it, play = resumeOnTap()) } else if (t == NEW_EPS) PosterAdapter(items) { openMeta(it) } else PosterAdapter(items) { openMeta(it) }
             list.scrollToPosition(0)
         }
     }
@@ -552,7 +555,7 @@ class LibraryFragment : Fragment() {
         val avail = dm.widthPixels - ctx.dp(24)
         val span = maxOf(3, avail / ctx.dp((120 * com.hortencioflix.tv.data.Prefs.posterScale()).toInt()))
         cellWidth = avail / span
-        adapter = MetaGridAdapter({ cellWidth }, { m -> openMeta(m, play = m.id in contIds) }, { m ->
+        adapter = MetaGridAdapter({ cellWidth }, { m -> openMeta(m, play = m.id in contIds && resumeOnTap()) }, { m ->
             if (m.id in contIds) continueMenu(ctx, m) { reload() }
         }, { label -> if (label.startsWith("↕")) sortAz = !sortAz else filter = label.removePrefix("● "); render() })
         val lm = GridLayoutManager(ctx, span)
